@@ -1,0 +1,701 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agent · 登录</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-card: rgba(18, 26, 40, 0.85);
+    --border: rgba(56, 132, 255, 0.25);
+    --accent: #3884ff;
+    --accent-glow: rgba(56, 132, 255, 0.35);
+    --text-primary: #e8edf5;
+    --text-secondary: #8899b4;
+    --input-bg: rgba(12, 20, 34, 0.8);
+    --success: #34d399;
+    --error: #f87171;
+    --font: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* 动态粒子背景 canvas */
+  #particles-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* 光晕层 */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 20% 50%, rgba(56,132,255,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 80% 50%, rgba(99,102,241,0.06) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* 主容器 */
+  .login-container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 1000px;
+    max-width: 94vw;
+    min-height: 580px;
+    background: var(--bg-card);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border-radius: 24px;
+    border: 1px solid var(--border);
+    box-shadow: 0 0 80px rgba(56,132,255,0.08), 0 32px 64px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  /* 认证检查中隐藏登录容器 */
+  .login-container.auth-checking {
+    display: none;
+  }
+
+  /* ===== 左侧品牌区 ===== */
+  .brand-panel {
+    flex: 1.2;
+    padding: 52px 48px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .brand-panel::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    left: -20%;
+    width: 70%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, rgba(56,132,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    margin-bottom: 36px;
+    position: relative;
+  }
+
+  .brand-badge .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .brand-title {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #f0f4ff 0%, #94b8ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .brand-sub {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 36px;
+    max-width: 360px;
+  }
+
+  /* AI 插图区域 */
+  .ai-illustration {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 160px;
+  }
+
+  .ai-brain {
+    width: 200px; height: 200px;
+    position: relative;
+  }
+
+  .node {
+    position: absolute;
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  .node:nth-child(1) { top: 30%; left: 50%; }
+  .node:nth-child(2) { top: 55%; left: 20%; }
+  .node:nth-child(3) { top: 55%; left: 80%; }
+  .node:nth-child(4) { top: 75%; left: 35%; }
+  .node:nth-child(5) { top: 75%; left: 65%; }
+
+  .core-sphere {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, rgba(56,132,255,0.4), rgba(56,132,255,0.05));
+    border: 1px solid rgba(56,132,255,0.3);
+    box-shadow:
+      0 0 40px rgba(56,132,255,0.15),
+      inset 0 0 40px rgba(56,132,255,0.05);
+    animation: pulse-sphere 4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-sphere {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.85; }
+  }
+
+  .orbit-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px solid rgba(56,132,255,0.12);
+    animation: spin linear infinite;
+  }
+  .orbit-ring.r1 { width: 130px; height: 130px; animation-duration: 20s; }
+  .orbit-ring.r2 { width: 170px; height: 170px; animation-duration: 28s; animation-direction: reverse; }
+  .orbit-ring.r3 { width: 210px; height: 210px; animation-duration: 36s; }
+
+  @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+  .orbit-dot {
+    position: absolute;
+    width: 4px; height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  .r1 .orbit-dot { top: -2px; left: calc(50% - 2px); }
+  .r2 .orbit-dot { bottom: -2px; right: calc(50% - 2px); }
+  .r3 .orbit-dot { top: 50%; left: -2px; transform: translateY(-50%); }
+
+  /* 底部能力标签 */
+  .capabilities {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 28px;
+    position: relative;
+  }
+
+  .cap-tag {
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 100px;
+    border: 1px solid rgba(56,132,255,0.18);
+    color: var(--text-secondary);
+    background: rgba(56,132,255,0.04);
+    letter-spacing: 0.3px;
+    transition: all 0.25s;
+  }
+  .cap-tag:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: rgba(56,132,255,0.08);
+  }
+
+  /* ===== 右侧登录区 ===== */
+  .login-panel {
+    flex: 1;
+    padding: 52px 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: rgba(10, 16, 26, 0.5);
+    border-left: 1px solid var(--border);
+    position: relative;
+  }
+
+  .login-panel::before {
+    content: "";
+    position: absolute;
+    bottom: -30%;
+    right: -20%;
+    width: 60%; height: 60%;
+    background: radial-gradient(ellipse at center, rgba(56,132,255,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .login-header {
+    margin-bottom: 32px;
+    position: relative;
+  }
+
+  .login-header h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .login-header p {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  /* 表单 */
+  .form-group {
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+  }
+
+  .form-group .input-wrap {
+    position: relative;
+  }
+
+  .form-group .input-wrap .icon {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    width: 18px; height: 18px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+
+  .form-group .input-wrap input {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px 0 44px;
+    background: var(--input-bg);
+    border: 1px solid rgba(56,132,255,0.15);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .form-group .input-wrap input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.4;
+    font-size: 14px;
+  }
+
+  .form-group .input-wrap input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(56,132,255,0.12);
+  }
+
+  .form-group .input-wrap:focus-within .icon {
+    opacity: 0.9;
+  }
+
+  .form-group .input-wrap .toggle-pwd {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0.4;
+    padding: 4px;
+    transition: opacity 0.2s;
+  }
+  .form-group .input-wrap .toggle-pwd:hover { opacity: 0.8; }
+
+  /* 选项栏 */
+  .form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .form-options label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .form-options label input[type="checkbox"] {
+    appearance: none;
+    width: 16px; height: 16px;
+    border: 1px solid rgba(56,132,255,0.25);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .form-options label input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .form-options label input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px; top: 1px;
+    width: 5px; height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .form-options a {
+    font-size: 13px;
+    color: var(--accent);
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .form-options a:hover { opacity: 1; }
+
+  /* 登录按钮 */
+  .btn-login {
+    width: 100%; height: 48px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.3s, transform 0.15s;
+  }
+
+  .btn-login:hover {
+    box-shadow: 0 0 30px rgba(56,132,255,0.3);
+  }
+
+  .btn-login:active {
+    transform: scale(0.98);
+  }
+
+  .btn-login.loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .btn-login .btn-text {
+    position: relative;
+    z-index: 1;
+  }
+
+  .btn-login .btn-spinner {
+    display: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22px; height: 22px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin-btn 0.7s linear infinite;
+  }
+
+  @keyframes spin-btn { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+  .btn-login.loading .btn-text { visibility: hidden; }
+  .btn-login.loading .btn-spinner { display: block; }
+
+  /* 错误提示 */
+  .error-msg {
+    display: none;
+    font-size: 13px;
+    color: var(--error);
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.2);
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    align-items: center;
+    gap: 8px;
+  }
+  .error-msg.show { display: flex; }
+  .error-msg svg { flex-shrink: 0; }
+
+  /* 页脚 */
+  .login-footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+  }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 768px) {
+    .login-container {
+      flex-direction: column;
+      max-width: 100vw;
+      min-height: auto;
+      border-radius: 16px;
+      margin: 16px;
+    }
+    .brand-panel { padding: 36px 28px 24px; }
+    .brand-title { font-size: 26px; }
+    .ai-illustration { min-height: 120px; }
+    .ai-brain { width: 150px; height: 150px; }
+    .core-sphere { width: 60px; height: 60px; }
+    .orbit-ring.r1 { width: 100px; height: 100px; }
+    .orbit-ring.r2 { width: 130px; height: 130px; }
+    .orbit-ring.r3 { width: 160px; height: 160px; }
+    .login-panel {
+      padding: 32px 28px 36px;
+      border-left: none;
+      border-top: 1px solid var(--border);
+    }
+    .capabilities { margin-top: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 粒子背景 -->
+<canvas id="particles-canvas"></canvas>
+
+<div class="login-container auth-checking" id="loginContainer">
+
+  <!-- 左侧品牌 -->
+  <div class="brand-panel">
+    <div class="brand-badge">
+      <span class="dot"></span>
+      系统在线 · v3.2.1
+    </div>
+    <div class="brand-title">AI Agent<br>智能协作平台</div>
+    <div class="brand-sub">
+      基于大语言模型的多智能体协作系统，赋能你的团队实现自动化任务编排与智能决策。
+    </div>
+
+    <!-- AI 效果插图 -->
+    <div class="ai-illustration">
+      <div class="ai-brain">
+        <div class="core-sphere"></div>
+        <div class="orbit-ring r1"><div class="orbit-dot"></div></div>
+        <div class="orbit-ring r2"><div class="orbit-dot"></div></div>
+        <div class="orbit-ring r3"><div class="orbit-dot"></div></div>
+        <div class="node"></div><div class="node"></div>
+        <div class="node"></div><div class="node"></div>
+        <div class="node"></div>
+      </div>
+    </div>
+
+    <!-- 能力标签 -->
+    <div class="capabilities">
+      <span class="cap-tag">多智能体编排</span>
+      <span class="cap-tag">自然语言交互</span>
+      <span class="cap-tag">自动化工作流</span>
+      <span class="cap-tag">知识库 RAG</span>
+      <span class="cap-tag">实时数据分析</span>
+    </div>
+  </div>
+
+  <!-- 右侧登录 -->
+  <div class="login-panel">
+    <div class="login-header">
+      <h2>欢迎回来</h2>
+      <p>登录以访问 AI Agent 管理控制台</p>
+    </div>
+
+    <!-- 错误消息 -->
+    <div class="error-msg" id="errorMsg">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <span id="errorText">账号或密码错误</span>
+    </div>
+
+    <form id="loginForm" autocomplete="off" novalidate>
+      <div class="form-group">
+        <label for="username">账号</label>
+        <div class="input-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input type="text" id="username" placeholder="请输入账号" value="admin" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">密码</label>
+        <div class="input-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="password" placeholder="请输入密码" value="admin" autocomplete="off">
+          <button type="button" class="toggle-pwd" id="togglePwd" tabindex="-1" aria-label="切换密码可见">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-options">
+        <label>
+          <input type="checkbox" id="rememberMe" checked>
+          记住我
+        </label>
+        <a href="#">忘记密码？</a>
+      </div>
+
+      <button type="submit" class="btn-login" id="loginBtn">
+        <span class="btn-text">登 录</span>
+        <span class="btn-spinner"></span>
+      </button>
+    </form>
+
+    <div class="login-footer">默认账号 admin / admin</div>
+  </div>
+</div>
+
+<script>
+(function initParticles() {
+  var c = document.getElementById("particles-canvas");
+  var ctx = c.getContext("2d");
+  var w, h, pts;
+
+  function resize() { w = c.width = window.innerWidth; h = c.height = window.innerHeight; }
+
+  function create(n) {
+    var a = [];
+    for (var i = 0; i < n; i++) a.push({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4, r: Math.random() * 2 + 0.5 });
+    return a;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, w, h);
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(56,132,255,0.3)"; ctx.fill();
+    }
+    for (var i = 0; i < pts.length; i++) {
+      for (var j = i + 1; j < pts.length; j++) {
+        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 130) {
+          ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.strokeStyle = "rgba(56,132,255," + (0.08 * (1 - dist / 130)) + ")";
+          ctx.lineWidth = 0.6; ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  resize(); pts = create(60); draw();
+  window.addEventListener("resize", function () { resize(); pts = create(60); });
+})();
+
+/* 密码显隐 */
+document.getElementById("togglePwd").addEventListener("click", function () {
+  var pwd = document.getElementById("password");
+  var show = pwd.type === "password";
+  pwd.type = show ? "text" : "password";
+  this.innerHTML = show
+    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+});
+
+/* Cookie 工具 */
+function setCookie(name, value, days) {
+  var d = new Date(); d.setTime(d.getTime() + days * 864e5);
+  document.cookie = encodeURIComponent(name) + "=" + encodeURIComponent(value) + ";expires=" + d.toUTCString() + ";path=/";
+}
+function getCookie(name) {
+  var m = document.cookie.match(new RegExp("(^| )" + encodeURIComponent(name) + "=([^;]+)"));
+  return m ? decodeURIComponent(m[2]) : null;
+}
+
+/* 登录逻辑 */
+(function () {
+  if (getCookie("ai_agent_token")) {
+    window.location.href = "index.html";
+    return;
+  }
+  document.getElementById("loginContainer").classList.remove("auth-checking");
+})();
+
+document.getElementById("loginForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var user = document.getElementById("username").value.trim();
+  var pass = document.getElementById("password").value.trim();
+  var err = document.getElementById("errorMsg");
+  var errText = document.getElementById("errorText");
+  var btn = document.getElementById("loginBtn");
+
+  err.classList.remove("show");
+  if (!user || !pass) {
+    errText.textContent = "请输入账号和密码";
+    err.classList.add("show"); return;
+  }
+
+  btn.classList.add("loading");
+
+  setTimeout(function () {
+    if (user === "admin" && pass === "admin") {
+      setCookie("ai_agent_token", btoa(JSON.stringify({ username: user, loginTime: new Date().toISOString(), role: "admin" })), 7);
+      setCookie("ai_agent_user", user, 7);
+      if (document.getElementById("rememberMe").checked) setCookie("ai_agent_remember", "1", 30);
+      window.location.href = "index.html";
+    } else {
+      btn.classList.remove("loading");
+      errText.textContent = "账号或密码错误，请重试";
+      err.classList.add("show");
+      document.getElementById("password").value = "";
+      document.getElementById("password").focus();
+    }
+  }, 600);
+});
+</script>
+</body>
+</html>
