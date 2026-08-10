@@ -1,0 +1,1074 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agent · 智能对话</title>
+<script src="config.js"></script>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-surface: #111827;
+    --bg-card: rgba(18, 26, 40, 0.85);
+    --border: rgba(56, 132, 255, 0.2);
+    --border-light: rgba(56, 132, 255, 0.1);
+    --accent: #3884ff;
+    --accent-hover: #4d94ff;
+    --accent-glow: rgba(56, 132, 255, 0.35);
+    --text-primary: #e8edf5;
+    --text-secondary: #8899b4;
+    --text-muted: #5a6b84;
+    --input-bg: rgba(12, 20, 34, 0.8);
+    --user-bubble: rgba(56, 132, 255, 0.15);
+    --ai-bubble: rgba(30, 41, 59, 0.6);
+    --success: #34d399;
+    --error: #f87171;
+    --warning: #fbbf24;
+    --font: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: var(--font);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+  }
+
+  /* ===== 布局 ===== */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+  }
+
+  /* 等待认证时隐藏 app */
+  .app.auth-checking {
+    visibility: hidden;
+  }
+
+  /* ===== 顶栏 ===== */
+  .header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 64px;
+    background: rgba(10, 14, 23, 0.9);
+    border-bottom: 1px solid var(--border-light);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-logo .logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .header-logo span {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #f0f4ff 0%, #94b8ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* 智能体选择器 */
+  .agent-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 16px;
+    border-left: 1px solid var(--border-light);
+  }
+
+  .agent-selector label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .agent-selector select {
+    appearance: none;
+    background: var(--input-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: var(--font);
+    padding: 7px 32px 7px 12px;
+    cursor: pointer;
+    outline: none;
+    min-width: 160px;
+    transition: border-color 0.2s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238899b4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+
+  .agent-selector select:hover {
+    border-color: rgba(56,132,255,0.3);
+  }
+
+  .agent-selector select:focus {
+    border-color: var(--accent);
+  }
+
+  .agent-selector select option {
+    background: #1a2332;
+    color: var(--text-primary);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .user-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .btn-logout {
+    background: none;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font);
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-logout:hover {
+    border-color: rgba(248,113,113,0.3);
+    color: var(--error);
+  }
+
+  .new-chat-btn {
+    background: none;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font);
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .new-chat-btn:hover {
+    border-color: rgba(56,132,255,0.3);
+    color: var(--accent);
+  }
+
+  /* ===== 消息区域 ===== */
+  .messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    position: relative;
+  }
+
+  .messages-area::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .messages-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .messages-area::-webkit-scrollbar-thumb {
+    background: rgba(56,132,255,0.15);
+    border-radius: 3px;
+  }
+
+  .messages-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(56,132,255,0.25);
+  }
+
+  .messages-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 32px 28px 24px;
+  }
+
+  /* 欢迎占位 */
+  .welcome-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 460px;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .welcome-placeholder .w-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(56,132,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .welcome-placeholder h2 {
+    font-size: 22px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #f0f4ff 0%, #94b8ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .welcome-placeholder p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    max-width: 400px;
+    line-height: 1.7;
+  }
+
+  .welcome-placeholder .hints {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .welcome-placeholder .hints span {
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    background: rgba(56,132,255,0.03);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .welcome-placeholder .hints span:hover {
+    border-color: rgba(56,132,255,0.3);
+    color: var(--text-primary);
+  }
+
+  /* ===== 消息行 ===== */
+  .message-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    animation: msg-in 0.35s ease-out;
+  }
+
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message-row.user {
+    flex-direction: row;
+  }
+
+  .message-row.ai {
+    flex-direction: row-reverse;
+  }
+
+  .msg-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .message-row.user .msg-avatar {
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    color: #fff;
+  }
+
+  .message-row.ai .msg-avatar {
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    color: #a5b4fc;
+  }
+
+  .msg-body {
+    max-width: 72%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .msg-bubble {
+    padding: 12px 18px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.7;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+
+  .message-row.user .msg-bubble {
+    background: var(--user-bubble);
+    border: 1px solid rgba(56,132,255,0.12);
+    border-bottom-left-radius: 6px;
+    color: var(--text-primary);
+  }
+
+  .message-row.ai .msg-bubble {
+    background: var(--ai-bubble);
+    border: 1px solid var(--border-light);
+    border-bottom-right-radius: 6px;
+    color: #dce3ef;
+  }
+
+  .msg-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 0 6px;
+  }
+
+  .message-row.user .msg-time {
+    text-align: left;
+  }
+
+  .message-row.ai .msg-time {
+    text-align: right;
+  }
+
+  /* ===== 正在输入指示器 ===== */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 0 8px;
+  }
+
+  .typing-indicator .typing-dots {
+    display: flex;
+    gap: 4px;
+    padding: 12px 18px;
+    background: var(--ai-bubble);
+    border: 1px solid var(--border-light);
+    border-radius: 18px;
+    border-bottom-right-radius: 6px;
+  }
+
+  .typing-indicator .typing-dots span {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: typing-bounce 1.4s ease-in-out infinite;
+  }
+
+  .typing-indicator .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-8px); opacity: 1; }
+  }
+
+  /* ===== 错误提示条 ===== */
+  .error-banner {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    margin: 0 28px 8px;
+    background: rgba(248,113,113,0.06);
+    border: 1px solid rgba(248,113,113,0.15);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--error);
+  }
+  .error-banner.show { display: flex; }
+
+  .error-banner button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0.6;
+  }
+  .error-banner button:hover { opacity: 1; }
+
+  /* ===== 输入区 ===== */
+  .input-area {
+    flex-shrink: 0;
+    padding: 16px 28px 20px;
+    background: rgba(10, 14, 23, 0.9);
+    border-top: 1px solid var(--border-light);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .input-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  .input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    background: var(--input-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    padding: 4px 12px;
+    transition: border-color 0.25s;
+  }
+
+  .input-wrap:focus-within {
+    border-color: rgba(56,132,255,0.35);
+  }
+
+  .input-wrap textarea {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: var(--font);
+    line-height: 1.5;
+    padding: 10px 4px;
+    resize: none;
+    min-height: 24px;
+    max-height: 120px;
+  }
+
+  .input-wrap textarea::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.35;
+  }
+
+  .btn-send {
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
+  }
+
+  .btn-send:hover:not(:disabled) {
+    box-shadow: 0 0 20px rgba(56,132,255,0.25);
+  }
+
+  .btn-send:active:not(:disabled) {
+    transform: scale(0.94);
+  }
+
+  .btn-send:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .btn-send svg {
+    width: 20px; height: 20px;
+  }
+
+  .input-footer {
+    max-width: 860px;
+    margin: 6px auto 0;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    opacity: 0.5;
+  }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 768px) {
+    .header {
+      padding: 0 16px;
+      height: 56px;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .header .agent-selector {
+      padding-left: 0;
+      border-left: none;
+    }
+
+    .agent-selector select {
+      min-width: 120px;
+      font-size: 13px;
+      padding: 5px 28px 5px 10px;
+    }
+
+    .user-info .user-name { display: none; }
+
+    .messages-inner {
+      padding: 20px 16px 16px;
+    }
+
+    .msg-body {
+      max-width: 85%;
+    }
+
+    .msg-bubble {
+      font-size: 14px;
+      padding: 10px 14px;
+    }
+
+    .input-area {
+      padding: 12px 16px 16px;
+    }
+
+    .welcome-placeholder {
+      min-height: 320px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="app auth-checking" id="app">
+
+  <!-- 顶栏 -->
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">
+        <div class="logo-dot"></div>
+        <span>AI Agent</span>
+      </div>
+
+      <div class="agent-selector">
+        <label for="agentSelect">智能体</label>
+        <select id="agentSelect">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+
+      <button class="new-chat-btn" id="newChatBtn" title="新对话">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新对话
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <span class="user-name" id="userName">admin</span>
+      </div>
+      <button class="btn-logout" id="logoutBtn">退出登录</button>
+    </div>
+  </header>
+
+  <!-- 错误横幅 -->
+  <div class="error-banner" id="errorBanner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="errorText">请求失败，请重试</span>
+    <button id="errorClose">&times;</button>
+  </div>
+
+  <!-- 消息区域 -->
+  <div class="messages-area" id="messagesArea">
+    <div class="messages-inner" id="messagesInner">
+      <!-- 欢迎占位，JS 动态渲染 -->
+    </div>
+  </div>
+
+  <!-- 输入区域 -->
+  <div class="input-area">
+    <div class="input-inner">
+      <div class="input-wrap">
+        <textarea id="messageInput" rows="1" placeholder="输入你的问题..." maxlength="2000"></textarea>
+      </div>
+      <button class="btn-send" id="sendBtn" disabled aria-label="发送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="input-footer">Enter 发送 · Shift+Enter 换行</div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Cookie 工具
+========================================================= */
+function getCookie(name) {
+  var m = document.cookie.match(new RegExp("(^| )" + encodeURIComponent(name) + "=([^;]+)"));
+  return m ? decodeURIComponent(m[2]) : null;
+}
+
+function deleteCookie(name) {
+  document.cookie = encodeURIComponent(name) + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+}
+
+/* =========================================================
+   状态
+========================================================= */
+var state = {
+  userId: '',
+  username: '',
+  currentAgentId: '',
+  sessionId: '',
+  isWaiting: false,
+  agents: []
+};
+
+/* =========================================================
+   登录检查
+========================================================= */
+(function checkAuth() {
+  var token = getCookie('ai_agent_token');
+  if (!token) {
+    window.location.href = 'login.html';
+    return;
+  }
+  try {
+    var decoded = JSON.parse(atob(token));
+    state.username = decoded.username || 'admin';
+    state.userId = decoded.username || 'admin';
+  } catch (e) {
+    state.username = getCookie('ai_agent_user') || 'admin';
+    state.userId = state.username;
+  }
+  document.getElementById('userName').textContent = state.username;
+  document.getElementById('userAvatar').textContent = state.username.charAt(0).toUpperCase();
+  document.getElementById('app').classList.remove('auth-checking');
+})();
+
+/* =========================================================
+   退出登录
+========================================================= */
+document.getElementById('logoutBtn').addEventListener('click', function () {
+  deleteCookie('ai_agent_token');
+  deleteCookie('ai_agent_user');
+  deleteCookie('ai_agent_remember');
+  window.location.href = 'login.html';
+});
+
+/* =========================================================
+  自动调整 textarea 高度
+========================================================= */
+var textarea = document.getElementById('messageInput');
+textarea.addEventListener('input', function () {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* =========================================================
+   显示 / 隐藏错误
+========================================================= */
+function showError(msg) {
+  document.getElementById('errorText').textContent = msg || '请求失败，请重试';
+  document.getElementById('errorBanner').classList.add('show');
+}
+
+function hideError() {
+  document.getElementById('errorBanner').classList.remove('show');
+}
+
+document.getElementById('errorClose').addEventListener('click', hideError);
+
+/* =========================================================
+   渲染欢迎占位
+========================================================= */
+function renderWelcome() {
+  var inner = document.getElementById('messagesInner');
+  inner.innerHTML = ''
+    + '<div class="welcome-placeholder">'
+    + '  <div class="w-icon">'
+    + '    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="' + getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+    + '  </div>'
+    + '  <h2>开始你的智能对话</h2>'
+    + '  <p>选择一个智能体，输入你的问题，AI 将为你提供专业的回答与建议。</p>'
+    + '  <div class="hints" id="hintTags"></div>'
+    + '</div>';
+  renderHintTags();
+}
+
+function renderHintTags() {
+  var container = document.getElementById('hintTags');
+  if (!container) return;
+  var hints = ['帮我分析一组数据', '编写一段代码', '解释一个概念', '制定一个计划'];
+  container.innerHTML = hints.map(function (t) {
+    return '<span>' + t + '</span>';
+  }).join('');
+  container.querySelectorAll('span').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var input = document.getElementById('messageInput');
+      input.value = this.textContent;
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+      updateSendBtn();
+      input.focus();
+    });
+  });
+}
+
+/* =========================================================
+   渲染消息
+========================================================= */
+function appendMessage(role, content) {
+  var inner = document.getElementById('messagesInner');
+  var welcome = inner.querySelector('.welcome-placeholder');
+  if (welcome) welcome.remove();
+
+  var time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  var avatar = role === 'user'
+    ? '<div class="msg-avatar">' + state.username.charAt(0).toUpperCase() + '</div>'
+    : '<div class="msg-avatar" style="font-size:12px">AI</div>';
+
+  if (role === 'user') {
+    var row = document.createElement('div');
+    row.className = 'message-row user';
+    row.innerHTML = ''
+      + avatar
+      + '<div class="msg-body">'
+      + '  <div class="msg-bubble">' + escapeHtml(content) + '</div>'
+      + '  <div class="msg-time">' + time + '</div>'
+      + '</div>';
+    inner.appendChild(row);
+  } else {
+    var row = document.createElement('div');
+    row.className = 'message-row ai';
+    row.innerHTML = ''
+      + avatar
+      + '<div class="msg-body">'
+      + '  <div class="msg-bubble" id="aiBubble"></div>'
+      + '  <div class="msg-time" id="aiTime">' + time + '</div>'
+      + '</div>';
+    inner.appendChild(row);
+  }
+
+  scrollToBottom();
+  return inner.lastElementChild;
+}
+
+function updateAiMessage(content) {
+  var bubble = document.getElementById('aiBubble');
+  if (bubble) bubble.textContent = content;
+  scrollToBottom();
+}
+
+function finishAiMessage() {
+  var bubble = document.getElementById('aiBubble');
+  if (bubble) bubble.id = '';
+  var timeEl = document.getElementById('aiTime');
+  if (timeEl) timeEl.id = '';
+}
+
+function scrollToBottom() {
+  var area = document.getElementById('messagesArea');
+  requestAnimationFrame(function () { area.scrollTop = area.scrollHeight; });
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+/* =========================================================
+   显示 / 隐藏正在输入
+========================================================= */
+var typingRow = null;
+
+function showTyping() {
+  var inner = document.getElementById('messagesInner');
+  typingRow = document.createElement('div');
+  typingRow.className = 'message-row ai';
+  typingRow.innerHTML = ''
+    + '<div class="msg-avatar" style="font-size:12px">AI</div>'
+    + '<div class="msg-body">'
+    + '  <div class="typing-indicator">'
+    + '    <div class="typing-dots"><span></span><span></span><span></span></div>'
+    + '  </div>'
+    + '</div>';
+  inner.appendChild(typingRow);
+  scrollToBottom();
+}
+
+function hideTyping() {
+  if (typingRow && typingRow.parentNode) {
+    typingRow.parentNode.removeChild(typingRow);
+  }
+  typingRow = null;
+}
+
+/* =========================================================
+   API 调用
+========================================================= */
+async function apiGet(path) {
+  var res = await fetch(API_BASE_URL + path, { method: 'GET', headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+async function apiPost(path, body) {
+  var res = await fetch(API_BASE_URL + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+/* =========================================================
+   加载智能体列表
+========================================================= */
+async function loadAgents() {
+  var select = document.getElementById('agentSelect');
+  try {
+    hideError();
+    var resp = await apiGet('/api/v1/query_ai_agent_config_list');
+    if (resp.code !== '0000') {
+      showError('获取智能体列表失败: ' + (resp.info || '未知错误'));
+      select.innerHTML = '<option value="">暂无智能体</option>';
+      return;
+    }
+    var list = resp.data || [];
+    state.agents = list;
+    if (list.length === 0) {
+      select.innerHTML = '<option value="">暂无智能体</option>';
+      return;
+    }
+    select.innerHTML = list.map(function (a) {
+      return '<option value="' + escapeHtml(a.agentId) + '" title="' + escapeHtml(a.agentDesc || '') + '">' + escapeHtml(a.agentName) + '</option>';
+    }).join('');
+    state.currentAgentId = list[0].agentId;
+    select.value = list[0].agentId;
+    updateSendBtn();
+  } catch (e) {
+    showError('无法连接后端服务，请确认服务已启动');
+    select.innerHTML = '<option value="">连接失败</option>';
+  }
+}
+
+document.getElementById('agentSelect').addEventListener('change', function () {
+  state.currentAgentId = this.value;
+  // 切换智能体时重置会话
+  state.sessionId = '';
+});
+
+/* =========================================================
+   创建会话
+========================================================= */
+async function createSession() {
+    var params = 'agentId=' + encodeURIComponent(state.currentAgentId) + '&userId=' + encodeURIComponent(state.userId);
+    var res = await fetch(API_BASE_URL + '/api/v1/create_session?' + params, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    if (data.code !== '0000') {
+      throw new Error(data.info || '创建会话失败');
+    }
+    return data.data.sessionId;
+  }
+
+/* =========================================================
+   发送消息（流式）
+========================================================= */
+async function sendMessage(text) {
+  if (!text.trim() || state.isWaiting) return;
+
+  if (!state.currentAgentId) {
+    showError('请先选择智能体');
+    return;
+  }
+
+  hideError();
+  var msg = text.trim();
+  document.getElementById('messageInput').value = '';
+  document.getElementById('sendBtn').disabled = true;
+  textarea.style.height = 'auto';
+  state.isWaiting = true;
+
+  // 添加用户消息
+  appendMessage('user', msg);
+
+  // 创建会话（如需要）
+  if (!state.sessionId) {
+    showTyping();
+    try {
+      state.sessionId = await createSession();
+      hideTyping();
+    } catch (e) {
+      hideTyping();
+      showError('创建会话失败: ' + e.message);
+      state.isWaiting = false;
+      updateSendBtn();
+      return;
+    }
+  }
+
+  // 添加 AI 消息占位
+  appendMessage('ai', '');
+
+  var fullContent = '';
+
+  try {
+    var resp = await fetch(API_BASE_URL + '/api/v1/chat_stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agentId: state.currentAgentId,
+        userId: state.userId,
+        sessionId: state.sessionId,
+        message: msg
+      })
+    });
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+    hideTyping();
+
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var done = false;
+
+    while (!done) {
+      var result = await reader.read();
+      done = result.done;
+      var chunk = decoder.decode(result.value, { stream: !done });
+      if (chunk) {
+        // 处理 server-sent events
+        var lines = chunk.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (line.startsWith('data:')) {
+            var data = line.substring(5).trim();
+            if (data && data !== '[DONE]') {
+              fullContent += data;
+              updateAiMessage(fullContent);
+            }
+          } else if (line && !line.startsWith(':') && !line.startsWith('event:') && !line.startsWith('id:')) {
+            // 纯文本块
+            fullContent += line;
+            updateAiMessage(fullContent);
+          }
+        }
+      }
+    }
+
+    finishAiMessage();
+
+  } catch (e) {
+    hideTyping();
+    showError('请求失败: ' + e.message);
+    // 清理空的 AI 气泡
+    var bubble = document.getElementById('aiBubble');
+    if (bubble) {
+      var row = bubble.closest('.message-row');
+      if (row) row.parentNode.removeChild(row);
+    }
+  }
+
+  state.isWaiting = false;
+  updateSendBtn();
+  scrollToBottom();
+}
+
+/* =========================================================
+   更新发送按钮状态
+========================================================= */
+function updateSendBtn() {
+  var btn = document.getElementById('sendBtn');
+  var val = document.getElementById('messageInput').value.trim();
+  btn.disabled = !val || state.isWaiting || !state.currentAgentId;
+}
+
+document.getElementById('messageInput').addEventListener('input', updateSendBtn);
+
+/* =========================================================
+   发送事件
+========================================================= */
+document.getElementById('sendBtn').addEventListener('click', function () {
+  sendMessage(document.getElementById('messageInput').value);
+});
+
+document.getElementById('messageInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (!this.value.trim() || state.isWaiting || !state.currentAgentId) return;
+    sendMessage(this.value);
+  }
+});
+
+/* =========================================================
+   新对话
+========================================================= */
+document.getElementById('newChatBtn').addEventListener('click', function () {
+  state.sessionId = '';
+  var inner = document.getElementById('messagesInner');
+  inner.innerHTML = '';
+  renderWelcome();
+});
+
+/* =========================================================
+   初始化
+========================================================= */
+renderWelcome();
+loadAgents();
+updateSendBtn();
+</script>
+</body>
+</html>
+
+
