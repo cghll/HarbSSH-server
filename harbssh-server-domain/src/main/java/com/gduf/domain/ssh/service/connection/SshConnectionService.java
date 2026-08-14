@@ -1,10 +1,11 @@
-package com.gduf.domain.ssh.servicee;
+package com.gduf.domain.ssh.service.connection;
 
 import com.gduf.domain.ssh.adapter.port.ISshSessionPort;
 import com.gduf.domain.ssh.adapter.repository.ISshConnectionRepository;
 import com.gduf.domain.ssh.model.entity.SshConnectionConfigEntity;
 import com.gduf.domain.ssh.model.entity.SshConnectionEntity;
 import com.gduf.domain.ssh.model.valobj.ConnectionStatusEnum;
+import com.gduf.domain.ssh.service.ISshConnectionDomainService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +14,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-public class SshConnectionService implements ISshConnectionDomainService{
+public class SshConnectionService implements ISshConnectionDomainService {
 
     private  final ISshSessionPort sshSessionService   ;
     private final ISshConnectionRepository repository;
@@ -79,6 +80,11 @@ public class SshConnectionService implements ISshConnectionDomainService{
         }
         if(entity.getEncrypted()==null){
             entity.setEncrypted(existing.getEncrypted());
+        }
+        entity.setStatus(existing.getStatus());
+        entity.setCreatedAt(existing.getCreatedAt());
+        if(entity.getUserId()==null || entity.getUserId().isBlank()){
+            entity.setUserId(existing.getUserId());
         }
 
         //更新连接

@@ -5,7 +5,7 @@ import com.gduf.domain.ssh.model.entity.SshConnectionConfigEntity;
 import com.gduf.domain.ssh.model.entity.SshConnectionEntity;
 import com.gduf.domain.ssh.model.valobj.AuthTypeEnum;
 import com.gduf.domain.ssh.model.valobj.ConnectionStatusEnum;
-import com.gduf.domain.ssh.servicee.ISshConnectionDomainService;
+import com.gduf.domain.ssh.service.ISshConnectionDomainService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
 import org.junit.Test;

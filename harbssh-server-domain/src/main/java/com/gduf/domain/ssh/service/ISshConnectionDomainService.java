@@ -1,4 +1,4 @@
-package com.gduf.domain.ssh.servicee;
+package com.gduf.domain.ssh.service;
 
 import com.gduf.domain.ssh.model.entity.SshConnectionConfigEntity;
 import com.gduf.domain.ssh.model.entity.SshConnectionEntity;
