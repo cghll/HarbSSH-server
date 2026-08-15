@@ -8,7 +8,7 @@
     <repository>
       <id>nexus-aliyun</id>
       <name>nexus-aliyun</name>
-      <url>http://maven.aliyun.com/nexus/content/groups/public/</url>
+      <url>https://maven.aliyun.com/repository/public</url>
       <releases/>
       <snapshots>
         <enabled>false</enabled>
@@ -195,11 +195,18 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.13.0</version>
+        <version>3.11.0</version>
         <configuration>
           <source>${java.version}</source>
           <target>${java.version}</target>
           <encoding>${project.build.sourceEncoding}</encoding>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>1.18.30</version>
+            </path>
+          </annotationProcessorPaths>
         </configuration>
       </plugin>
       <plugin>

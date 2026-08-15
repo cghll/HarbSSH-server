@@ -39,3 +39,4 @@ build/
 /.idea/
 /docs/prompt/nginx-html-api-integration.md
 **/package-info.java
+/harbssh-server-app/data/

@@ -23,11 +23,15 @@ public class SshExecuteAdkTool {
     //当前线程的终端绘画ID（使用InheritableThreadLocal支持异步线程继承）
     private static final InheritableThreadLocal<String> currentTerminalSession = new InheritableThreadLocal<>();
 
+    /** 当前会话级终端会话ID（由 Controller 设置，优先级低于 ThreadLocal）,下面会实现双写 */
+    private static volatile String sessionTerminalSessionId;
+
     /**
-     * 设置当前线程的终端会话ID（兼容旧接口）
+     * 设置当前线程的终端会话ID
      */
     public static void setCurrentTerminalSession(String terminalSessionId) {
         currentTerminalSession.set(terminalSessionId);
+        sessionTerminalSessionId = terminalSessionId;
         log.info("[ThreadLocal] 设置终端会话: thread={}, terminalSession={}",
                 Thread.currentThread().getName(), terminalSessionId);
     }
@@ -37,6 +41,7 @@ public class SshExecuteAdkTool {
      */
     public static void clearCurrentTerminalSession() {
         currentTerminalSession.remove();
+        sessionTerminalSessionId = null;
         log.info("[ThreadLocal] 清除终端会话: thread={}",
                 Thread.currentThread().getName());
     }
@@ -45,8 +50,14 @@ public class SshExecuteAdkTool {
             @Annotations.Schema(name = "command", description = "要执行的 Shell 命令，如: ls -la, apt install docker.io, docker --version")
             String command){
 
-        //有限从ThreadLocal获取，支持异步线程继承
+        //优先从ThreadLocal获取，支持异步线程继承
         String terminalSessionId = currentTerminalSession.get();
+
+        // ThreadLocal 为空时回退到会话级变量（线程池场景下 ThreadLocal 可能失效）
+        if (terminalSessionId == null || terminalSessionId.isEmpty()) {
+            terminalSessionId = sessionTerminalSessionId;
+            log.info("[executeCommand] ThreadLocal 为空，回退到会话级变量: terminalSessionId={}", terminalSessionId);
+        }
 
         log.info("[executeCommand] thread={}, terminalSessionId={}, command={}",
                 Thread.currentThread().getName(), terminalSessionId, command);
