@@ -1,14 +1,13 @@
 package com.gduf.trigger.http;
 
 
-import com.gduf.api.ISshConnectionService;
 import com.gduf.api.dto.SshConnectionRequestDTO;
 import com.gduf.api.dto.SshConnectionResponseDTO;
 import com.gduf.api.response.Response;
 import com.gduf.domain.ssh.model.entity.SshConnectionConfigEntity;
 import com.gduf.domain.ssh.model.entity.SshConnectionEntity;
 import com.gduf.domain.ssh.model.valobj.AuthTypeEnum;
-import com.gduf.domain.ssh.service.ISshConnectionDomainService;
+import com.gduf.domain.ssh.service.ISshConnectionService;
 import com.gduf.types.enums.ResponseCode;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -34,12 +33,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ssh")
 @CrossOrigin(origins = "*")
-public class SshConnectionController implements ISshConnectionService {
+public class SshConnectionController implements com.gduf.api.ISshConnectionService {
 
     private static final java.time.format.DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Resource
-    private ISshConnectionDomainService sshConnectionDomainService;
+    private ISshConnectionService sshConnectionDomainService;
 
     @PostMapping("/connections")
     @Override

@@ -5,7 +5,7 @@ import com.gduf.domain.ssh.model.entity.SshConnectionEntity;
 
 import java.util.List;
 
-public interface ISshConnectionDomainService {
+public interface ISshConnectionService {
     /**
      * 创建SSH连接
      */

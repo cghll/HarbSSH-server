@@ -6,6 +6,7 @@ import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.model.valobj.properties.AiAgentAutoConfigProperties;
 import com.gduf.domain.agent.service.IChatService;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
+import com.gduf.domain.agent.service.armory.matter.tools.SshExecuteAdkTool;
 import com.gduf.types.enums.ResponseCode;
 import com.gduf.types.exception.AppException;
 import com.google.adk.events.Event;
@@ -95,6 +96,25 @@ public class ChatService implements IChatService {
         InMemoryRunner runner = aiAgentRegisterVO.getRunner();
         Content userMsg = Content.fromParts(Part.fromText(message));
         return runner.runAsync(userId, sessionId, userMsg);
+    }
+
+    @Override
+    public Flowable<Event> handleMessageStream(String agentId, String userId, String sessionId, String message, String terminalSessionId) {
+        AiAgentRegisterVO aiAgentRegisterVO = defaultArmoryFactory.getAiAgentRegisterVO(agentId);
+        if(null==aiAgentRegisterVO){
+            throw new AppException(ResponseCode.E0001.getCode());
+        }
+        InMemoryRunner runner = aiAgentRegisterVO.getRunner();
+
+        // 设置终端会话ID到ThreadLocal，供工具使用
+        if(terminalSessionId!=null&&!terminalSessionId.isEmpty()){
+            log.info("设置终端会话ID: {}", terminalSessionId);
+            SshExecuteAdkTool.setCurrentTerminalSession(terminalSessionId);
+        }
+
+        Content userMsg = Content.fromParts(Part.fromText(message));
+
+        return runner.runAsync(userId,sessionId,userMsg);
     }
 
     @Override

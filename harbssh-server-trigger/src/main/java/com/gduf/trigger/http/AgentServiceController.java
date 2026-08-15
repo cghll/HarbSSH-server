@@ -134,8 +134,22 @@ public class AgentServiceController implements IAgentService {
     public ResponseBodyEmitter chatStream(@RequestBody ChatRequestDTO requestDTO) {
         ResponseBodyEmitter emitter = new ResponseBodyEmitter(3 * 60 * 1000L);
         try {
-            log.info("流式对话 agentId:{} userId:{} sessionId:{} message:{}", requestDTO.getAgentId(), requestDTO.getUserId(), requestDTO.getSessionId(), requestDTO.getMessage());
-            chatService.handleMessageStream(requestDTO.getAgentId(), requestDTO.getUserId(), requestDTO.getSessionId(), requestDTO.getMessage())
+            log.info("流式对话 agentId:{} userId:{} sessionId:{} message:{}",
+                    requestDTO.getAgentId(), requestDTO.getUserId(), requestDTO.getSessionId(), requestDTO.getMessage());
+
+            //如果未指定sessionId，先创建
+            String sessionId = requestDTO.getSessionId();
+            if(sessionId==null||sessionId.isEmpty()){
+                chatService.createSession(requestDTO.getAgentId(),requestDTO.getUserId());
+            }
+
+            //传递终端会话id
+            chatService.handleMessageStream(
+                    requestDTO.getAgentId(),
+                    requestDTO.getUserId(),
+                    requestDTO.getSessionId(),
+                    requestDTO.getMessage(),
+                    requestDTO.getTerminalSessionId())
                     .subscribe(
                             event -> {
                                 try {

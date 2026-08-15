@@ -30,7 +30,8 @@
         <dependency>
             <groupId>com.jcraft</groupId>
             <artifactId>jsch</artifactId>
-            <version>0.1.55</version>
+            <!-- 0.1.55 已多年未维护，与 OpenSSH 8.x 存在握手兼容问题；维护版保持 com.jcraft.jsch 包名，可直接替换 -->
+            <version>0.1.54</version>
         </dependency>
         <dependency>
             <groupId>org.mybatis</groupId>

@@ -5,7 +5,7 @@ import com.gduf.domain.ssh.model.entity.SshConnectionConfigEntity;
 import com.gduf.domain.ssh.model.entity.SshConnectionEntity;
 import com.gduf.domain.ssh.model.valobj.AuthTypeEnum;
 import com.gduf.domain.ssh.model.valobj.ConnectionStatusEnum;
-import com.gduf.domain.ssh.service.ISshConnectionDomainService;
+import com.gduf.domain.ssh.service.ISshConnectionService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
 import org.junit.Test;
@@ -27,7 +27,7 @@ import java.util.List;
 public class SshConnectionDomainServiceTest {
 
     @Resource
-    private ISshConnectionDomainService sshConnectionDomainService;
+    private ISshConnectionService sshConnectionDomainService;
 
     /**
      * 测试：创建SSH连接（密码认证 + 高级配置）

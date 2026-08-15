@@ -56,6 +56,7 @@ public class RunnerNode extends AbstractArmorySupport {
         }
         BaseAgent baseAgent = dynamicContext.getAgentGroup().get(agentName);
 
+        //从spring容器中获取bean
         List<BasePlugin> plugins;
         List<String> pluginNameList = runnerConfig.getPluginNameList();
         if(pluginNameList!=null && !pluginNameList.isEmpty()){
