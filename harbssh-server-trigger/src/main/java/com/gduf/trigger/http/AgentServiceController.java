@@ -208,7 +208,7 @@ public class AgentServiceController implements IAgentService {
                         try {
                             event.stringifyContent();
 
-                            // 1. 处理文本内容（AI 的回复文本）
+                            // 1. 处理文本内容（AI 的回复文本） ---文本事件
                             String eventText = event.stringifyContent();
                             if (!eventText.isBlank()) {
                                 textAccumulator.append(eventText);
@@ -222,7 +222,7 @@ public class AgentServiceController implements IAgentService {
                                         eventText.length(), textAccumulator.length(), event.turnComplete());
                             }
 
-                            // 2. 从 stateDelta 检测工具执行结果（SSH 命令输出）
+                            // 2. 从 stateDelta 检测工具执行结果（SSH 命令输出）---工具事件
                             EventActions actions = event.actions();
                             if (actions != null) {
                                 Map<String, Object> stateDelta = actions.stateDelta();
@@ -267,7 +267,7 @@ public class AgentServiceController implements IAgentService {
                     });
 
 
-                    // 发送 done 事件
+                    // 发送 done 事件 ---完成事件
                     Map<String, Object> doneEvent = new HashMap<>();
                     doneEvent.put("event", "done");
                     doneEvent.put("content", textAccumulator.toString());

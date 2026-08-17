@@ -145,6 +145,10 @@
         </dependency>
         <dependency>
             <groupId>com.gduf</groupId>
+            <artifactId>harbssh-server-case</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gduf</groupId>
             <artifactId>harbssh-server-infrastructure</artifactId>
         </dependency>
     </dependencies>
@@ -175,6 +179,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <skipTests>false</skipTests>
                     <testFailureIgnore>false</testFailureIgnore>
                     <includes>
                         <include>**/*Test.java</include>
