@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * SSH 命令执行 ADK 工具，为智能体提供在 SSH 终端执行命令的能力
@@ -25,6 +26,12 @@ public class SshExecuteAdkTool {
 
     /** 当前会话级终端会话ID（由 Controller 设置，优先级低于 ThreadLocal）,下面会实现双写 */
     private static volatile String sessionTerminalSessionId;
+
+    // 危险命令模式（需要用户确认），这些命令，也可以设计成配置来使用
+    private static final Pattern DANGEROUS_PATTERN = Pattern.compile(
+            "\\b(rm\\s+-rf\\s+/|dd\\s+if=|mkfs\\.|:\\(\\)\\s*\\{|>\\s*/dev/sd|chmod\\s+-R\\s+777\\s+/)\\b",
+            Pattern.CASE_INSENSITIVE
+    );
 
     /**
      * 设置当前线程的终端会话ID
@@ -46,6 +53,12 @@ public class SshExecuteAdkTool {
                 Thread.currentThread().getName());
     }
 
+    /**
+     * 在 SSH 终端执行命令
+     *
+     * @param command 要执行的 Shell 命令
+     * @return 执行结果
+     */
     public Map<String ,Object> executeCommand(
             @Annotations.Schema(name = "command", description = "要执行的 Shell 命令，如: ls -la, apt install docker.io, docker --version")
             String command){
@@ -71,11 +84,21 @@ public class SshExecuteAdkTool {
             );
         }
 
+        // 检查会话是否存在
         if (!sshTerminalService.sessionExists(terminalSessionId)) {
             log.warn("[executeCommand] 终端会话不存在: {}", terminalSessionId);
             return Map.of(
                     "success", false,
                     "output", "SSH 终端会话不存在或已关闭: " + terminalSessionId,
+                    "command", command
+            );
+        }
+
+        // 危险命令检测
+        if (DANGEROUS_PATTERN.matcher(command).find()) {
+            return Map.of(
+                    "success", false,
+                    "output", "⚠️ 危险命令被拦截: " + command + "\n该命令可能导致系统损坏或数据丢失。如确需执行，请手动在终端操作。",
                     "command", command
             );
         }

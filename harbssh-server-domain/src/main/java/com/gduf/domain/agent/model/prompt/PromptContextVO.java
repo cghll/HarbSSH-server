@@ -1,0 +1,28 @@
+package com.gduf.domain.agent.model.prompt;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+@Builder
+public class PromptContextVO {
+    //服务器信息
+    private String serverInfo;
+    //操作系统信息
+    private String osInfo;
+    //当前登录用户，如ubuntu，root
+    private String currentUser;
+    //当前工作目录
+    private String currentDirectory;
+
+    /**
+     * 执行命令
+     */
+    private List<String> recentCommands;
+    /**
+     * 里程碑记录
+     */
+    private List<MilestoneVO> milestoneVOS;
+}
