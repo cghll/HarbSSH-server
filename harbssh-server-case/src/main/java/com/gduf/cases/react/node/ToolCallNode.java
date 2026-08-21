@@ -5,6 +5,8 @@ import com.gduf.api.dto.ChatRequestDTO;
 import com.gduf.api.dto.ReActResultDTO;
 import com.gduf.cases.react.AbstractAIAgentReActSupport;
 import com.gduf.cases.react.factory.DefaultReActFactory;
+import com.gduf.domain.agent.service.IChatContextService;
+import com.gduf.domain.agent.service.IPromptService;
 import com.gduf.domain.agent.service.armory.matter.tools.SshExecuteAdkTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +52,12 @@ public class ToolCallNode extends AbstractAIAgentReActSupport {
 
     @Resource
     private SshExecuteAdkTool sshExecuteAdkTool;
+
+    @Resource
+    private IPromptService promptService;
+
+    @Resource
+    private IChatContextService chatContextService;
 
     @Override
     protected ReActResultDTO doApply(ChatRequestDTO requestParameter, DefaultReActFactory.DynamicContext dynamicContext) throws Exception {
@@ -199,6 +207,11 @@ public class ToolCallNode extends AbstractAIAgentReActSupport {
 
             // 追加 tool 消息到消息历史（供下一轮 AI 调用使用）
             dynamicContext.appendToolMessage(toolCallId, resultContent);
+
+            // 记录里程碑和工具执行摘要（供下一轮 Prompt 注入）
+            promptService.detectAndRecordMilestone(dynamicContext.getSessionId(),"tool",resultContent);
+
+            chatContextService.pushToolResult(dynamicContext.getSessionId(), toolName, resultContent);
 
             // 发送 tool_result SSE 事件
             sendToolResultEvent(emitter, toolCallId, resultContent, status);
