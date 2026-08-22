@@ -68,6 +68,11 @@ public class DefaultReActFactory {
         // ══════════════════════════════════════════════════════════
 
         /**
+         * 原始用户任务描述（防止在多轮交互中被前缀污染）
+         */
+        private String originalUserTask;
+
+        /**
          * 消息历史
          * 格式：{ role: "user"/"assistant"/"tool", content: "...", tool_call_id?: "..." }
          */
@@ -85,6 +90,13 @@ public class DefaultReActFactory {
          */
         @Builder.Default
         private List<Map<String, Object>> currentToolResults = new ArrayList<>();
+
+        /**
+         * 整个会话中实际执行的工具调用记录（供最终结果展示）
+         */
+        @Builder.Default
+        private List<Map<String, Object>> executedToolCalls = new ArrayList<>();
+
 
 
         // ══════════════════════════════════════════════════════════
@@ -104,7 +116,7 @@ public class DefaultReActFactory {
         /** 每轮最大工具调用次数 */
         private int maxToolCallsPerRound;
 
-        /** 总工具调用次数 */
+        /** 总工具调用次数 (作为真值源) */
         @Builder.Default
         private AtomicInteger totalToolCallCount = new AtomicInteger(0);
 

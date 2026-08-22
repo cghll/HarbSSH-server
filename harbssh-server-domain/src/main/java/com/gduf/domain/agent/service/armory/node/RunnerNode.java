@@ -6,13 +6,16 @@ import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.service.armory.AbstractArmorySupport;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
+import com.gduf.domain.agent.service.armory.matter.session.factory.CustomRunnerFactory;
 import com.gduf.types.enums.ResponseCode;
 import com.gduf.types.exception.AppException;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.SequentialAgent;
 import com.google.adk.plugins.BasePlugin;
 import com.google.adk.runner.InMemoryRunner;
+import com.google.adk.runner.Runner;
 import com.google.common.collect.ImmutableList;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -24,6 +27,10 @@ import java.util.List;
 @Slf4j
 @Service
 public class RunnerNode extends AbstractArmorySupport {
+
+    @Resource
+    private CustomRunnerFactory customRunnerFactory;
+
     @Override
     protected AiAgentRegisterVO doApply(ArmoryCommandEntity requestParameter, DefaultArmoryFactory.DynamicContext dynamicContext) throws Exception {
         log.info("AI Agent 装配操作-RunnerNode");
@@ -33,7 +40,9 @@ public class RunnerNode extends AbstractArmorySupport {
         String agentId = agent.getAgentId();
         String agentName = agent.getAgentName();
         String agentDesc = agent.getAgentDesc();
-        InMemoryRunner runner = getRunner(dynamicContext, aiAgentConfigTableVO, appName);
+
+        Runner runner = getRunner(dynamicContext, aiAgentConfigTableVO, appName);
+
         AiAgentRegisterVO aiAgentRegisterVO = AiAgentRegisterVO.builder()
                 .appName(appName)
                 .agentId(agentId)
@@ -47,7 +56,7 @@ public class RunnerNode extends AbstractArmorySupport {
         return aiAgentRegisterVO;
     }
 
-    private  InMemoryRunner getRunner(DefaultArmoryFactory.DynamicContext dynamicContext, AiAgentConfigTableVO aiAgentConfigTableVO, String appName) {
+    private  Runner getRunner(DefaultArmoryFactory.DynamicContext dynamicContext, AiAgentConfigTableVO aiAgentConfigTableVO, String appName) {
         AiAgentConfigTableVO.Module.Runner runnerConfig = aiAgentConfigTableVO.getModule().getRunner();
         String agentName = runnerConfig.getAgentName();
         if(StringUtils.isBlank(agentName)){
@@ -70,7 +79,7 @@ public class RunnerNode extends AbstractArmorySupport {
         }
 
 
-        return new InMemoryRunner(baseAgent, appName, plugins);
+        return customRunnerFactory.create(baseAgent, appName, plugins);
     }
 
     @Override

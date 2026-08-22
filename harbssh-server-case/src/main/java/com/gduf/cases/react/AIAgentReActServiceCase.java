@@ -87,7 +87,7 @@ public class AIAgentReActServiceCase implements IAIAgentReActServiceCase {
                     .build();
 
             ReActResultDTO result = rootNode.apply(requestDTO, dynamicContext);
-            return result.getContent();
+            return result.getFinalResponse();
         } catch (Exception e) {
             log.error("ReAct 普通对话异常", e);
             return "Error: " + e.getMessage();

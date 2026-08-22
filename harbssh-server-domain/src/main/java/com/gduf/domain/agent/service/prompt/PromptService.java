@@ -54,33 +54,12 @@ public class PromptService implements IPromptService {
         milestoneTracker.detectAndRecord(sessionId,role,content);
     }
 
-    /**
-     * 构建注入了动态上下文的用户消息（富化消息）。
-     * <p>
-     * 内部完成两步：
-     * <ol>
-     *   <li>通过 {@link IChatContextService#buildPromptContext} 聚合上下文（终端环境、当前任务、里程碑、工具摘要）</li>
-     *   <li>调用 {@link DynamicPromptBuilder#buildMessagePrefix} 生成结构化前缀，拼在原始消息前面</li>
-     * </ol>
-     * 前缀为空（第一轮无历史）时直接返回原始用户消息。
-     *
-     * @param userMessage        原始用户消息
-     * @param sessionId          对话会话 ID
-     * @param terminalSessionId  SSH 终端会话 ID（可为 null）
-     * @param recentCommands     最近执行的命令列表
-     * @param messageHistory     对话历史记录
-     * @return 注入了动态上下文的用户消息
-     */
     @Override
-    public String buildEnrichedMessage(String userMessage, String sessionId, String terminalSessionId, List<String> recentCommands, List<Map<String, Object>> messageHistory) {
-        // 1. 通过 ChatContextService 采集上下文
-        PromptContextVO promptContextVO = chatContextService.buildPromptContext(sessionId, "userId_placeholder", terminalSessionId, messageHistory);
-
-        // 追加来自 Case 层的 recentCommands
+    public String buildEnrichedMessage(String userMessage, String sessionId, String userId, String terminalSessionId, List<String> recentCommands, List<Map<String, Object>> messageHistory) {
+        PromptContextVO promptContextVO = chatContextService.buildPromptContext(sessionId, userId, terminalSessionId, messageHistory);
         promptContextVO.setRecentCommands(recentCommands);
-        // 2. 生成消息前缀
-        String prefix = dynamicPromptBuilder.buildMessagePrefix(promptContextVO);
 
+        String prefix = dynamicPromptBuilder.buildMessagePrefix(promptContextVO);
         if (prefix.isEmpty()) {
             return userMessage;
         }

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>职责：
  * 1. 从 ChatRequestDTO 提取会话参数
  * 2. 初始化 DynamicContext
- * 3. 绑定终端会话 ID（ThreadLocal）
+ * 3. 绑定终端会话 ID（ThreadLocal 和 Session 映射双重绑定）
  * 4. 路由到 AiCallNode
  *
  * <p>节点链：
@@ -41,14 +41,15 @@ public class RootNode extends AbstractAIAgentReActSupport {
         String terminalSessionId = requestParameter.getTerminalSessionId();
         String message = requestParameter.getMessage();
 
-        //2.绑定终端会话（threadLocal，支持异步线程继承）
+        //2.绑定终端会话（ThreadLocal + 映射绑定，支持异步和跨请求继承）
         if(terminalSessionId!=null && !terminalSessionId.isEmpty()){
-            setCurrentTerminalSession(terminalSessionId);
+            bindTerminalSession(sessionId, terminalSessionId);
         }else{
             //尝试从会话绑定中获取
             String boundTerminal = getTerminalSession(sessionId);
             if(boundTerminal!=null){
                 setCurrentTerminalSession(boundTerminal);
+                dynamicContext.setTerminalSessionId(boundTerminal); // 补齐 dynamicContext 中的值
             }
         }
 
@@ -56,7 +57,13 @@ public class RootNode extends AbstractAIAgentReActSupport {
         dynamicContext.setSessionId(sessionId);
         dynamicContext.setUserId(userId);
         dynamicContext.setAgentId(agentId);
-        dynamicContext.setTerminalSessionId(terminalSessionId);
+
+        if (dynamicContext.getTerminalSessionId() == null) {
+            dynamicContext.setTerminalSessionId(terminalSessionId);
+        }
+
+        // 记录首轮最干净的原始任务，防止在长对话或前缀注入后被污染
+        dynamicContext.setOriginalUserTask(message);
         dynamicContext.setMessageHistory(new java.util.ArrayList<>());
         dynamicContext.setCurrentToolCalls(new java.util.ArrayList<>());
         dynamicContext.setCurrentToolResults(new java.util.ArrayList<>());
@@ -79,7 +86,7 @@ public class RootNode extends AbstractAIAgentReActSupport {
         dynamicContext.appendUserMessage(message);
 
         log.info("ReAct RootNode - 初始化完成 sessionId={}, userId={}, agentId={}, terminalSessionId={}",
-                sessionId, userId, agentId, terminalSessionId);
+                sessionId, userId, agentId, dynamicContext.getTerminalSessionId());
 
         // 6. 路由到 AI 调用节点
         return router(requestParameter, dynamicContext);
