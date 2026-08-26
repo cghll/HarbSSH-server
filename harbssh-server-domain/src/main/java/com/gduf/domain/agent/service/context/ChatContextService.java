@@ -1,11 +1,10 @@
 package com.gduf.domain.agent.service.context;
 
-import com.gduf.domain.agent.model.prompt.MilestoneVO;
-import com.gduf.domain.agent.model.prompt.PromptContextVO;
+import com.gduf.domain.agent.model.valobj.prompt.MilestoneVO;
+import com.gduf.domain.agent.model.valobj.prompt.PromptContextVO;
 import com.gduf.domain.agent.service.IChatContextService;
 import com.gduf.domain.agent.service.context.provider.ContextProvider;
 import com.gduf.domain.agent.service.context.provider.impl.ToolResultProvider;
-import com.gduf.domain.agent.service.context.reducer.MessageReducer;
 import com.gduf.domain.agent.service.context.reducer.impl.HybridReducer;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

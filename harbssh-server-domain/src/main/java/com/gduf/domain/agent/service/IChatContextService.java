@@ -1,7 +1,7 @@
 package com.gduf.domain.agent.service;
 
 
-import com.gduf.domain.agent.model.prompt.PromptContextVO;
+import com.gduf.domain.agent.model.valobj.prompt.PromptContextVO;
 
 import java.util.List;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package com.gduf.domain.agent.model.prompt;
+package com.gduf.domain.agent.model.valobj.prompt;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

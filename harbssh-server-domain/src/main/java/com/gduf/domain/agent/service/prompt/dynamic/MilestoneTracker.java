@@ -1,6 +1,6 @@
 package com.gduf.domain.agent.service.prompt.dynamic;
 
-import com.gduf.domain.agent.model.prompt.MilestoneVO;
+import com.gduf.domain.agent.model.valobj.prompt.MilestoneVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

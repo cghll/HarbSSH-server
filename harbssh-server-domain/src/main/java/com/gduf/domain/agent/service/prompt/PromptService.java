@@ -1,12 +1,10 @@
 package com.gduf.domain.agent.service.prompt;
 
-import com.gduf.domain.agent.model.prompt.MilestoneVO;
-import com.gduf.domain.agent.model.prompt.PromptContextVO;
+import com.gduf.domain.agent.model.valobj.prompt.PromptContextVO;
 import com.gduf.domain.agent.service.IChatContextService;
 import com.gduf.domain.agent.service.IPromptService;
 import com.gduf.domain.agent.service.prompt.dynamic.DynamicPromptBuilder;
 import com.gduf.domain.agent.service.prompt.dynamic.MilestoneTracker;
-import com.gduf.domain.ssh.service.ISshTerminalService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
