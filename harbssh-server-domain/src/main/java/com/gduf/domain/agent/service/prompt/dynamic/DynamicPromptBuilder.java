@@ -100,6 +100,13 @@ public class DynamicPromptBuilder {
 
         if (!hasContent) return "";
 
+        // 意图标签（由意图识别系统经 PromptContextVO.intentLabel 注入，让 AI 感知用户当前意图）
+        // 输出形如 "[用户意图]\nDIAGNOSE\n"，仅做提示不做强制路由。
+        if (!isEmpty(ctx.getIntentLabel())) {
+            log.info("意图识别:{}", ctx.getIntentLabel());
+            sb.append("\n[用户意图]\n").append(ctx.getIntentLabel()).append("\n");
+        }
+
         String prefix = sb.toString();
         log.debug("构建消息前缀，长度: {}", prefix.length());
         return prefix;

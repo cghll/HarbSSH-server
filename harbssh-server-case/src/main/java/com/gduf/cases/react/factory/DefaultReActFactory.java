@@ -1,6 +1,7 @@
 package com.gduf.cases.react.factory;
 
 import com.gduf.api.dto.ReActResultDTO;
+import com.gduf.domain.agent.model.valobj.intent.IntentResultVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -177,6 +178,16 @@ public class DefaultReActFactory {
         /** 最近执行的命令记录（用于注入到动态 Prompt 中） */
         @Builder.Default
         private List<String> recentCommands = new ArrayList<>();
+
+        // ══════════════════════════════════════════════════════════
+        //  意图状态（Phase 3: 意图识别系统）
+        // ══════════════════════════════════════════════════════════
+
+        /** 当前意图名称（IntentTypeEnumVO 的 name()，注入 Prompt 前缀用） */
+        private String currentIntent;
+
+        /** 当前意图识别完整结果（供反馈回路 reportFeedback 读取与重分类回写） */
+        private IntentResultVO currentIntentResult;
 
         // ══════════════════════════════════════════════════════════
         //  辅助方法
