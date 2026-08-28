@@ -54,10 +54,47 @@ public class SshExecuteAdkTool {
     }
 
     /**
-     * 在 SSH 终端执行命令
+     * 在 SSH 终端执行命令。
+     * <p>
+     * 从 ThreadLocal 或会话级变量获取终端会话 ID，执行命令后返回结果。
+     * <p>
+     * 案例 1：成功执行
+     * <pre>
+     *   currentTerminalSession = "ssh-session-001"
+     *   command = "df -h"
      *
-     * @param command 要执行的 Shell 命令
-     * @return 执行结果
+     *   返回：
+     *   {
+     *     "command": "df -h",
+     *     "output": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        50G   20G   30G  40% /",
+     *     "success": true
+     *   }
+     * </pre>
+     * <p>
+     * 案例 2：命令不存在
+     * <pre>
+     *   command = "nonexistent-command"
+     *
+     *   返回：
+     *   {
+     *     "command": "nonexistent-command",
+     *     "output": "command not found: nonexistent-command",
+     *     "success": false,
+     *     "suggestion": "命令不存在。可能原因：命令拼写错误..."
+     *   }
+     * </pre>
+     * <p>
+     * 案例 3：危险命令被拦截
+     * <pre>
+     *   command = "rm -rf /"
+     *
+     *   返回：
+     *   {
+     *     "command": "rm -rf /",
+     *     "output": "⚠️ 危险命令被拦截: rm -rf /\n该命令可能导致系统损坏或数据丢失。",
+     *     "success": false
+     *   }
+     * </pre>
      */
     public Map<String ,Object> executeCommand(
             @Annotations.Schema(name = "command", description = "要执行的 Shell 命令，如: ls -la, apt install docker.io, docker --version")

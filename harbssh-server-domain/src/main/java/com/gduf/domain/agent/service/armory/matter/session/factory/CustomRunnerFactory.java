@@ -7,9 +7,11 @@ import com.google.adk.artifacts.InMemoryArtifactService;
 import com.google.adk.plugins.BasePlugin;
 import com.google.adk.runner.Runner;
 import jakarta.annotation.Resource;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+@Component
 public class CustomRunnerFactory {
     @Resource
     private CustomAdkSessionService customAdkSessionService;

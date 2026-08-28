@@ -10,6 +10,7 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.*;
@@ -58,6 +59,7 @@ import java.util.stream.Collectors;
  * 目标不是把所有历史都留下，而是让框架层会话<strong>干净、轻量、可控</strong>，
  * 同时避免与业务侧 {@code ChatContextService} 管理的上下文发生重复和打架。
  */
+@Component
 public class CustomAdkSessionService implements BaseSessionService {
 
     /** Session 最多保留的 event 条数，防止框架层历史无限膨胀。 */
