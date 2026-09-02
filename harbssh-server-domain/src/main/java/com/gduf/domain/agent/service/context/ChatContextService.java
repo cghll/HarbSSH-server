@@ -160,6 +160,9 @@ public class ChatContextService implements IChatContextService {
                 .serverInfo((String) finalCtx.get("serverInfo"))
                 .milestoneVOS((List<MilestoneVO>) finalCtx.get("milestoneVOS"))
                 .toolResultSummary((String) finalCtx.get("toolResultSummary"))
+                // 长期记忆摘要（新增）：由 LongTermMemoryProvider(order=25) 召回并注入，
+                // 经 DynamicPromptBuilder 渲染为 [长期记忆] 段落拼到用户消息前面。
+                .longTermMemorySummary((String) finalCtx.get("longTermMemorySummary"))
                 .taskDescription((String) finalCtx.get("taskDescription"))
                 .build();
 

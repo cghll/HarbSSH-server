@@ -232,6 +232,8 @@ public class LongTermMemoryService implements ILongTermMemoryService {
                 .build());
     }
 
+    //以下是对外使用
+
     /**
      * {@inheritDoc}
      * <p>
