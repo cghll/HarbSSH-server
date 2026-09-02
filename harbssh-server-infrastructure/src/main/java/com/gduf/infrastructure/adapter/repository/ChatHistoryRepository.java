@@ -11,6 +11,7 @@ import com.gduf.infrastructure.dao.po.ChatMessagePO;
 import com.gduf.infrastructure.dao.po.ChatMilestonePO;
 import com.gduf.infrastructure.dao.po.ChatSessionPO;
 import jakarta.annotation.Resource;
+import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
  *
  * @see IChatHistoryRepository
  */
+@Repository
 public class ChatHistoryRepository implements IChatHistoryRepository {
 
     @Resource
