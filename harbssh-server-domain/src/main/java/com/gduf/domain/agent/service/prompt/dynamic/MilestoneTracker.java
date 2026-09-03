@@ -1,13 +1,12 @@
 package com.gduf.domain.agent.service.prompt.dynamic;
 
+import com.gduf.domain.agent.adapter.repository.IChatHistoryRepository;
 import com.gduf.domain.agent.model.valobj.prompt.MilestoneVO;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -22,6 +21,9 @@ public class MilestoneTracker {
 
     private static final int MAX_MILESTONES = 50;
     private final Map<String, LinkedList<MilestoneVO>> milestones = new ConcurrentHashMap<>();
+
+    @Resource
+    private IChatHistoryRepository chatHistoryRepository;
 
     /**
      * 检测并记录里程碑事件。
@@ -91,12 +93,21 @@ public class MilestoneTracker {
      * @param milestoneVO  里程碑事件
      */
     private void push(String sessionId, MilestoneVO milestoneVO) {
+        // 1. 内存缓存（ConcurrentHashMap + LinkedList，滑动窗口 50 条）
         LinkedList<MilestoneVO> list = milestones.computeIfAbsent(sessionId, k -> new LinkedList<>());
         synchronized (list) {
             list.addLast(milestoneVO);
             while (list.size() > MAX_MILESTONES) {
                 list.removeFirst();
             }
+        }
+
+        // 2. 数据库持久化（2-8 新增）：try-catch 旁路写入，失败不影响主流程。
+        // 旁路写入原则：记忆持久化是"锦上添花"而非"生死攸关"，不能因为 DB 异常导致 Agent 不可用。
+        try {
+            chatHistoryRepository.saveMilestone(sessionId, milestoneVO);
+        } catch (Exception e) {
+            log.error("保存里程碑失败 sessionId={}", sessionId, e);
         }
     }
 
@@ -108,6 +119,20 @@ public class MilestoneTracker {
      * @return 里程碑列表（按时间正序），无数据时返回空列表
      */
     public List<MilestoneVO> getRecent(String sessionId, int limit) {
+        // DB 优先查询（新增）：重启后从 DB 恢复里程碑数据，保证持久化不丢失。
+        try {
+            List<MilestoneVO> recentMilestones = chatHistoryRepository.getRecentMilestones(sessionId, limit);
+            if (recentMilestones != null && !recentMilestones.isEmpty()) {
+                // DB 查询返回的是倒序，这里转为正序返回
+                List<MilestoneVO> reversed = new ArrayList<>(recentMilestones);
+                Collections.reverse(reversed);
+                return reversed;
+            }
+        } catch (Exception e) {
+            log.error("获取近期里程碑失败 sessionId={}", sessionId, e);
+        }
+
+        // DB 查询失败或无数据时降级到内存缓存
         LinkedList<MilestoneVO> list = milestones.getOrDefault(sessionId, new LinkedList<>());
         synchronized (list) {
             int from = Math.max(0, list.size() - limit);

@@ -1,6 +1,8 @@
 package com.gduf.domain.agent.service;
 
 import com.gduf.domain.agent.model.entity.ChatCommandEntity;
+import com.gduf.domain.agent.model.entity.ChatMessageEntity;
+import com.gduf.domain.agent.model.entity.ChatSessionEntity;
 import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.google.adk.events.Event;
 import io.reactivex.rxjava3.core.Flowable;
@@ -66,4 +68,15 @@ public interface IChatService {
      * @return 事件流
      */
     List<String> handleMessage(ChatCommandEntity chatCommandEntity);
+
+    /**
+     * 查询用户会话列表
+     */
+    List<ChatSessionEntity> querySessionList(String agentId, String userId, int limit);
+
+    /**
+     * 查询会话消息列表
+     */
+    List<ChatMessageEntity> queryMessageList(String sessionId, int limit);
+
 }

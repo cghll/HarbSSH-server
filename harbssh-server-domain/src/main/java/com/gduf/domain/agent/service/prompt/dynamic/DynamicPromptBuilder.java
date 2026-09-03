@@ -37,8 +37,12 @@ public class DynamicPromptBuilder {
         sb.append(baseInstruction);
 
         appendEnvironmentInfo(sb, ctx);
+        appendTaskDescription(sb, ctx);
         appendRecentCommands(sb, ctx);
         appendMilestones(sb, ctx);
+        appendToolResultSummary(sb, ctx);
+        appendLongTermMemorySummary(sb, ctx);
+        appendIntentLabel(sb, ctx);
 
         String result = sb.toString();
         log.debug("动态 Prompt 构建完成，长度: {} (基础: {}, 动态: {})",
@@ -108,15 +112,6 @@ public class DynamicPromptBuilder {
             hasContent = true;
         }
 
-        if(!isEmpty(ctx.getToolResultSummary())){
-            sb.append("\n[工具执行结果]\n").append(ctx.getToolResultSummary()).append("\n");
-            hasContent = true;
-        }
-        if(!isEmpty(ctx.getTaskDescription())){
-            sb.append("\n[任务描述]\n").append(ctx.getTaskDescription()).append("\n");
-            hasContent = true;
-        }
-
         if (!isEmpty(ctx.getTaskDescription())) {
             sb.append("\n[当前任务]\n").append(ctx.getTaskDescription()).append("\n");
             hasContent = true;
@@ -131,7 +126,6 @@ public class DynamicPromptBuilder {
             sb.append("\n[长期记忆]\n").append(ctx.getLongTermMemorySummary()).append("\n");
             hasContent = true;
         }
-
 
         // 意图标签（由意图识别系统经 PromptContextVO.intentLabel 注入，让 AI 感知用户当前意图）
         // 输出形如 "[用户意图]\nDIAGNOSE\n"，仅做提示不做强制路由。
@@ -151,7 +145,7 @@ public class DynamicPromptBuilder {
 
 
     /**
-     * 追加当前任务描述段落（2-8 增强：优先从 TaskStateVO 获取，比从消息历史推断更准确）
+     * 追加当前任务描述段落（增强：优先从 TaskStateVO 获取，比从消息历史推断更准确）
      */
     private void appendTaskDescription(StringBuilder sb, PromptContextVO ctx) {
         if (isEmpty(ctx.getTaskDescription())) {
@@ -173,7 +167,7 @@ public class DynamicPromptBuilder {
     }
 
     /**
-     * 追加长期记忆段落（2-8 新增）。
+     * 追加长期记忆段落（新增）。
      * <p>
      * 将 LongTermMemoryProvider 召回的长期记忆摘要渲染为 [长期记忆] 段落，
      * 拼到用户消息前面，让主模型感知用户偏好、环境信息、软件版本、排查经验等。

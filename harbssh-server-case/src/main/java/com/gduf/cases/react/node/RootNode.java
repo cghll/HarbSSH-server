@@ -5,9 +5,16 @@ import com.gduf.api.dto.ChatRequestDTO;
 import com.gduf.api.dto.ReActResultDTO;
 import com.gduf.cases.react.AbstractAIAgentReActSupport;
 import com.gduf.cases.react.factory.DefaultReActFactory;
+import com.gduf.domain.agent.model.entity.ChatMessageEntity;
+import com.gduf.domain.agent.service.ILongTermMemoryService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -29,6 +36,9 @@ public class RootNode extends AbstractAIAgentReActSupport {
     private static final int DEFAULT_MAX_STEPS = 50;
     private static final int DEFAULT_MAX_TOOL_CALLS = 200;
     private static final int DEFAULT_MAX_TOOL_CALLS_PER_ROUND = 10;
+
+    @Resource
+    private ILongTermMemoryService longTermMemoryService;
 
     @Override
     protected ReActResultDTO doApply(ChatRequestDTO requestParameter, DefaultReActFactory.DynamicContext dynamicContext) throws Exception {
@@ -64,9 +74,26 @@ public class RootNode extends AbstractAIAgentReActSupport {
 
         // 记录首轮最干净的原始任务，防止在长对话或前缀注入后被污染
         dynamicContext.setOriginalUserTask(message);
-        dynamicContext.setMessageHistory(new java.util.ArrayList<>());
-        dynamicContext.setCurrentToolCalls(new java.util.ArrayList<>());
-        dynamicContext.setCurrentToolResults(new java.util.ArrayList<>());
+        // 冷启动恢复（新增）：从 DB 加载最近 50 条历史消息，恢复对话上下文。
+        // 这样即使服务重启，用户之前排查的上下文也能接上，而不是从空开始。
+        List<Map<String, Object>> history = new ArrayList<>();
+        // 冷启动恢复（新增）：委托领域服务从 DB 加载最近 50 条历史消息，恢复对话上下文，
+        // case 层不再直接调用仓储层。
+        List<ChatMessageEntity> recentMessages = longTermMemoryService.getRecentMessages(sessionId, 50);
+        for (ChatMessageEntity msg : recentMessages) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("role", msg.getRole());
+            map.put("content", msg.getContent() != null ? msg.getContent() : "");
+            // tool 消息需要补全 tool_call_id 和 name，供 ADK 框架正确关联
+            if ("tool".equals(msg.getRole()) && msg.getToolCallId() != null) {
+                map.put("tool_call_id", msg.getToolCallId());
+                map.put("name", msg.getToolName());
+            }
+            history.add(map);
+        }
+        dynamicContext.setMessageHistory(history);
+        dynamicContext.setCurrentToolCalls(new ArrayList<>());
+        dynamicContext.setCurrentToolResults(new ArrayList<>());
         dynamicContext.setCurrentStep(new AtomicInteger(0));
         dynamicContext.setMaxSteps(DEFAULT_MAX_STEPS);
         dynamicContext.setMaxToolCalls(DEFAULT_MAX_TOOL_CALLS);

@@ -1,6 +1,9 @@
 package com.gduf.domain.agent.service.chat;
 
+import com.gduf.domain.agent.adapter.repository.IChatHistoryRepository;
 import com.gduf.domain.agent.model.entity.ChatCommandEntity;
+import com.gduf.domain.agent.model.entity.ChatMessageEntity;
+import com.gduf.domain.agent.model.entity.ChatSessionEntity;
 import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.model.valobj.properties.AiAgentAutoConfigProperties;
@@ -32,8 +35,13 @@ public class ChatService implements IChatService {
 
     @Resource
     private DefaultArmoryFactory defaultArmoryFactory;
+
     @Resource
     private AiAgentAutoConfigProperties aiAgentAutoConfigProperties;
+
+    @Resource
+    private IChatHistoryRepository chatHistoryRepository;
+
     private final Map<String,String> userSessions=new ConcurrentHashMap<>();
     @Override
     public List<AiAgentConfigTableVO.Agent> queryAiAgentConfig() {
@@ -57,9 +65,26 @@ public class ChatService implements IChatService {
         }
         String appName = aiAgentRegisterVO.getAppName();
         Runner runner = aiAgentRegisterVO.getRunner();
-        return userSessions.computeIfAbsent(userId,uId->{
-            Session session = runner.sessionService().createSession(appName, uId)
+        String sessionKey = agentId + ":" + userId;
+
+        return userSessions.computeIfAbsent(sessionKey,key->{
+            Session session = runner.sessionService().createSession(appName, userId)
                     .blockingGet();
+
+            // 会话元数据落库（新增）：try-catch 旁路写入，DB 写入失败不影响 ADK Session 创建。
+            // 旁路原则：如果 DB 异常（如表不存在），只是 DB 里没有这条记录，不影响 Agent 正常运行。
+            try {
+                chatHistoryRepository.saveSession(ChatSessionEntity.builder()
+                        .id(session.id())
+                        .agentId(agentId)
+                        .userId(userId)
+                        .title("新会话")
+                        .messageCount(0)
+                        .build());
+            } catch (Exception e) {
+                log.error("保存会话元数据失败 sessionId={}", session.id(), e);
+            }
+
             return session.id();
         });
     }
@@ -156,5 +181,34 @@ public class ChatService implements IChatService {
         List<String> outputs=new ArrayList<>();
         events.blockingForEach(event -> {outputs.add(event.stringifyContent());});
         return outputs;
+    }
+
+    /**
+     * 查询用户会话列表（新增）。
+     * <p>
+     * 为前端历史记录功能提供后端支撑，默认返回最多 20 条。
+     *
+     * @param agentId 智能体 ID
+     * @param userId  用户 ID
+     * @param limit   最大返回条数，≤0 时默认 20
+     * @return 会话列表
+     */
+    @Override
+    public List<ChatSessionEntity> querySessionList(String agentId, String userId, int limit) {
+        return chatHistoryRepository.querySessionList(agentId, userId, limit > 0 ? limit : 20);
+    }
+
+    /**
+     * 查询会话消息列表（新增）。
+     * <p>
+     * 为前端历史消息展示提供后端支撑，默认返回最多 100 条。
+     *
+     * @param sessionId 会话 ID
+     * @param limit     最大返回条数，≤0 时默认 100
+     * @return 消息列表（时间正序）
+     */
+    @Override
+    public List<ChatMessageEntity> queryMessageList(String sessionId, int limit) {
+        return chatHistoryRepository.queryMessageList(sessionId, limit > 0 ? limit : 100);
     }
 }

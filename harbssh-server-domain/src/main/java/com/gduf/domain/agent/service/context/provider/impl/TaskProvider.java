@@ -1,6 +1,9 @@
 package com.gduf.domain.agent.service.context.provider.impl;
 
+import com.gduf.domain.agent.model.valobj.intent.TaskStateVO;
+import com.gduf.domain.agent.service.IIntentService;
 import com.gduf.domain.agent.service.context.provider.ContextProvider;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -41,6 +44,10 @@ import java.util.Map;
  */
 @Component
 public class TaskProvider implements ContextProvider {
+
+    @Resource
+    private IIntentService intentService;
+
     @Override
     public String getName() {
         return "task";
@@ -59,6 +66,17 @@ public class TaskProvider implements ContextProvider {
     @Override
     public Map<String, Object> provide(String sessionId, String userId, String terminalSessionId, List<Map<String, Object>> messageHistory) {
         HashMap<String, Object> result = new HashMap<>();
+
+        // 优先从 TaskStateVO 获取（新增）：TaskStateVO 的任务描述是经过意图分类系统"验证"过的，
+        // 比从消息历史中推断更准确。分类时如果识别为业务意图，就把当前消息设为任务描述。
+        TaskStateVO taskState = intentService.getTaskState(sessionId);
+        if (taskState != null && taskState.getTaskDescription() != null && !taskState.getTaskDescription().isBlank()) {
+            result.put("taskDescription", taskState.getTaskDescription());
+            return result;
+        }
+
+        // 降级：从消息历史中找第一条 user 消息，并清洗可能带的前缀污染。
+        // 这里我们先对可能带前缀的 user message 做一次简单清洗。
         if(messageHistory!=null){
             messageHistory.stream()
                     .filter(m->"user".equals(m.get("role")))

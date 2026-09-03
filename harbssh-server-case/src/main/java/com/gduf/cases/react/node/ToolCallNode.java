@@ -7,6 +7,7 @@ import com.gduf.api.dto.ReActResultDTO;
 import com.gduf.cases.react.AbstractAIAgentReActSupport;
 import com.gduf.cases.react.factory.DefaultReActFactory;
 import com.gduf.domain.agent.service.IChatContextService;
+import com.gduf.domain.agent.service.ILongTermMemoryService;
 import com.gduf.domain.agent.service.IPromptService;
 import com.gduf.domain.agent.service.armory.matter.tools.SshExecuteAdkTool;
 import jakarta.annotation.Resource;
@@ -41,6 +42,9 @@ public class ToolCallNode extends AbstractAIAgentReActSupport {
 
     @Resource
     private IChatContextService chatContextService;
+
+    @Resource
+    private ILongTermMemoryService longTermMemoryService;
 
     @Override
     protected ReActResultDTO doApply(ChatRequestDTO requestParameter, DefaultReActFactory.DynamicContext dynamicContext) throws Exception {
@@ -112,6 +116,15 @@ public class ToolCallNode extends AbstractAIAgentReActSupport {
 
                 // 补全 ADK 自动执行模式下缺失的 messageHistory 写入
                 dynamicContext.appendToolMessage(toolCallId, content);
+                // 长期记忆提取（工具观察，新增）：从工具输出中自动识别环境信息、软件版本、失败信号等，
+                // 提取为 ENVIRONMENT_FACT / SOFTWARE_FACT / TROUBLESHOOTING_CASE 记忆。
+                longTermMemoryService.recordToolObservation(
+                        dynamicContext.getUserId(),
+                        dynamicContext.getSessionId(),
+                        toolName,
+                        content,
+                        !isFailureContent(content)
+                );
             } else {
                 log.warn("未找到工具结果记录: id={}, name={}", toolCallId, toolName);
             }
@@ -179,6 +192,17 @@ public class ToolCallNode extends AbstractAIAgentReActSupport {
 
             chatContextService.pushToolResult(dynamicContext.getSessionId(), toolName, resultContent);
 
+            // 工具结果落库 + 长期记忆提取：委托领域服务完成"消息落库（role=tool, priority=HIGH）
+            // + 环境/软件/失败信号记忆提取"闭环，case 层不再直接调用仓储层。
+            longTermMemoryService.saveToolMessage(
+                    dynamicContext.getUserId(),
+                    dynamicContext.getSessionId(),
+                    toolName,
+                    toolCallId,
+                    resultContent,
+                    "success".equals(status) && !isFailureContent(resultContent)
+            );
+
             // 发送 tool_result SSE 事件
             sendToolResultEvent(emitter, toolCallId, resultContent, status);
         }
@@ -187,6 +211,29 @@ public class ToolCallNode extends AbstractAIAgentReActSupport {
     // ═══════════════════════════════════════════════════════════════
     //  工具执行
     // ═══════════════════════════════════════════════════════════════
+
+
+    /**
+     * 判断工具输出内容是否包含失败特征（error、failed、permission denied 等）。
+     * <p>
+     * 用于长期记忆提取时判断 success 参数：如果工具执行状态为 success 但内容包含失败信号，
+     * 也会被 recordToolObservation 记录为 TROUBLESHOOTING_CASE。
+     *
+     * @param content 工具执行输出内容
+     * @return true 表示内容包含失败特征
+     */
+    private boolean isFailureContent(String content) {
+        if (content == null) {
+            return false;
+        }
+        String normalized = content.toLowerCase();
+        return normalized.contains("error")
+                || normalized.contains("failed")
+                || normalized.contains("not found")
+                || normalized.contains("no such")
+                || normalized.contains("permission denied")
+                || normalized.contains("connection refused");
+    }
 
     private String executeTool(String toolName, String args) throws Exception {
         if ("executeCommand".equals(toolName)) {

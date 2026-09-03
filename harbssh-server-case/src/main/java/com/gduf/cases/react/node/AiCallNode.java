@@ -8,6 +8,8 @@ import com.gduf.cases.react.factory.DefaultReActFactory;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.model.valobj.intent.IntentResultVO;
 import com.gduf.domain.agent.model.valobj.intent.IntentTypeEnumVO;
+import com.gduf.domain.agent.model.valobj.intent.TaskStateVO;
+import com.gduf.domain.agent.service.ILongTermMemoryService;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
 import com.gduf.domain.agent.service.armory.matter.tools.SshExecuteAdkTool;
 import com.gduf.domain.agent.service.context.ChatContextService;
@@ -24,10 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * AI 调用节点（ReAct 循环核心）
@@ -83,6 +82,9 @@ public class AiCallNode extends AbstractAIAgentReActSupport {
     @Resource
     private IntentService intentService;
 
+    @Resource
+    private ILongTermMemoryService longTermMemoryService;
+
     /** tool name 映射：stateDelta key -> tool name */
     private static final Map<String, String> STATE_DELTA_TOOL_MAPPING = Map.of(
             "ssh_result", "executeCommand"
@@ -120,6 +122,7 @@ public class AiCallNode extends AbstractAIAgentReActSupport {
         // 将意图保存到上下文供后续使用
         dynamicContext.setCurrentIntent(intentResult.getIntent().name());
         dynamicContext.setCurrentIntentResult(intentResult);
+        syncTaskStateAfterClassification(dynamicContext, lastUserMessage, intentResult);
         // COMPOUND / UNKNOWN / 低置信度：交给主模型自行判断，不再硬路由
         if (intentResult.getIntent() == IntentTypeEnumVO.COMPOUND) {
             log.info("复合意图，候选 {} —— 交由主模型拆解", intentResult.getCandidateIntents());
@@ -151,6 +154,16 @@ public class AiCallNode extends AbstractAIAgentReActSupport {
         // 6. 构建动态上下文并注入用户消息
         String enrichedMessage = buildEnrichedMessage(lastUserMessage, dynamicContext);
         log.debug("注入动态上下文后消息长度: {} -> {}", lastUserMessage.length(), enrichedMessage.length());
+
+        // 用户消息落库 + 长期记忆提取（用户侧）：委托领域服务完成"消息落库 + 偏好记忆提取"闭环，
+        // case 层不再直接调用仓储层。仅首轮（step==0）落库 user 消息，避免多轮循环重复写入。
+        longTermMemoryService.saveUserMessage(
+                dynamicContext.getUserId(),
+                dynamicContext.getSessionId(),
+                lastUserMessage,
+                dynamicContext.getCurrentIntent(),
+                dynamicContext.getStep() == 0
+        );
 
         // 7. 构建用户消息
         Content userContent = Content.builder()
@@ -306,6 +319,15 @@ public class AiCallNode extends AbstractAIAgentReActSupport {
         log.info("ReAct AiCallNode - 第 {} 步完成，本轮工具调用 {} 次，文本长度 {}",
                 dynamicContext.getStep(), dynamicContext.getRoundToolCallCount().get(), textAccumulator.length());
 
+        if (!textAccumulator.isEmpty()) {
+            // 助手回复落库 + 结论记忆提取：委托领域服务完成闭环。
+            longTermMemoryService.saveAssistantMessage(
+                    dynamicContext.getUserId(),
+                    dynamicContext.getSessionId(),
+                    textAccumulator.toString()
+            );
+        }
+
         // 11. 发送本轮结束事件
         sendRoundEndEvent(
                 dynamicContext.getEmitter(),
@@ -441,7 +463,137 @@ public class AiCallNode extends AbstractAIAgentReActSupport {
             dynamicContext.setCurrentIntent(reclassified.getIntent().name());
             dynamicContext.setCurrentIntentResult(reclassified);
         }
+        updateTaskStateAfterFeedback(dynamicContext, success, reclassified);
     }
+
+
+    /**
+     * 分类后同步任务态：处理 CONTINUE 续接、非业务意图跳过、新任务创建/覆盖。
+     * <p>
+     * 策略：
+     * <ul>
+     *   <li>CONTINUE：如有进行中任务态则校准步骤索引、清除失败标记，并回写 currentIntent 为根意图</li>
+     *   <li>UNKNOWN/CHAT：不维护任务态，直接返回</li>
+     *   <li>其他业务意图：无任务态/已完成/意图变更 → 创建新 TaskStateVO；否则复用并刷新</li>
+     * </ul>
+     *
+     * @param @param lastUserMessage 最新用户消息（作为任务描述）
+     * @param intentResult   本轮意图识别结果
+     */
+    private void syncTaskStateAfterClassification(DefaultReActFactory.DynamicContext dynamicContext,
+                                                  String lastUserMessage,
+                                                  IntentResultVO intentResult) {
+        if (intentResult == null) {
+            return;
+        }
+
+        String sessionId = dynamicContext.getSessionId();
+        IntentTypeEnumVO intent = intentResult.getIntent();
+        TaskStateVO taskState = intentService.getTaskState(sessionId);
+
+        if (intent == IntentTypeEnumVO.CONTINUE) {
+            if (taskState != null && !taskState.isCompleted()) {
+                if (taskState.getCurrentStepIndex() < 0) {
+                    taskState.setCurrentStepIndex(0);
+                }
+                taskState.setLastFeedbackFailed(false);
+                intentService.updateTaskState(sessionId, taskState);
+                if (taskState.getRootIntent() != null) {
+                    //把根意图变成现在的主意图
+                    dynamicContext.setCurrentIntent(taskState.getRootIntent().name());
+                }
+            }
+            return;
+        }
+
+        if (intent == IntentTypeEnumVO.UNKNOWN || intent == IntentTypeEnumVO.CHAT) {
+            return;
+        }
+
+        boolean shouldReplace = taskState == null
+                || taskState.isCompleted()
+                || taskState.getRootIntent() != intent;
+
+        if (shouldReplace) {
+            List<String> steps = new ArrayList<>();
+            steps.add(lastUserMessage);
+            taskState = TaskStateVO.builder()
+                    .taskDescription(lastUserMessage)
+                    .rootIntent(intent)
+                    .steps(steps)
+                    .currentStepIndex(0)
+                    .completed(false)
+                    .lastFeedbackFailed(false)
+                    .build();
+        } else {
+            if (taskState.getTaskDescription() == null || taskState.getTaskDescription().isBlank()) {
+                taskState.setTaskDescription(lastUserMessage);
+            }
+            if (taskState.getSteps() == null || taskState.getSteps().isEmpty()) {
+                taskState.setSteps(new ArrayList<>(List.of(lastUserMessage)));
+            }
+            if (taskState.getCurrentStepIndex() < 0) {
+                taskState.setCurrentStepIndex(0);
+            }
+            taskState.setCompleted(false);
+            taskState.setLastFeedbackFailed(false);
+        }
+
+        intentService.updateTaskState(sessionId, taskState);
+    }
+
+    /**
+     * 反馈后更新任务态：成功推进步骤索引，失败标记 lastFeedbackFailed，
+     * 重分类时替换 rootIntent。
+     * <p>
+     * 流程：
+     * <pre>
+     *   工具反馈回调
+     *     ├─ 无任务态 → 直接返回
+     *     ├─ reclassified 非 null 且非兜底意图 → 替换 rootIntent
+     *     ├─ success=true → currentStepIndex++ 或标记 completed
+     *     └─ success=false → lastFeedbackFailed=true
+     * </pre>
+     *
+     * @param @param success      本轮工具执行是否成功
+     * @param reclassified  反馈回路重分类结果，可为 null
+     */
+    private void updateTaskStateAfterFeedback(DefaultReActFactory.DynamicContext dynamicContext,
+                                              boolean success,
+                                              IntentResultVO reclassified) {
+        TaskStateVO taskState = intentService.getTaskState(dynamicContext.getSessionId());
+        if (taskState == null) {
+            return;
+        }
+
+        if (reclassified != null
+                && reclassified.getIntent() != null
+                && reclassified.getIntent() != IntentTypeEnumVO.UNKNOWN
+                && reclassified.getIntent() != IntentTypeEnumVO.CONTINUE
+                && reclassified.getIntent() != IntentTypeEnumVO.CHAT) {
+            taskState.setRootIntent(reclassified.getIntent());
+        }
+
+        taskState.setLastFeedbackFailed(!success);
+
+        if (success) {
+            if (taskState.getSteps() == null || taskState.getSteps().isEmpty()) {
+                taskState.setSteps(new ArrayList<>(List.of(taskState.getTaskDescription())));
+            }
+            if (taskState.getCurrentStepIndex() < 0) {
+                taskState.setCurrentStepIndex(0);
+            }
+            if (taskState.getCurrentStepIndex() >= taskState.getSteps().size() - 1) {
+                taskState.setCompleted(true);
+            } else {
+                taskState.setCurrentStepIndex(taskState.getCurrentStepIndex() + 1);
+            }
+        }
+
+        intentService.updateTaskState(dynamicContext.getSessionId(), taskState);
+    }
+
+
 
 
     /**
