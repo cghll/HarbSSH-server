@@ -88,7 +88,10 @@ public class IntentService implements IIntentService {
     @Resource
     private ContextTracker contextTracker;
 
-    // 简单的 LRU 缓存，最大 200 个条目
+    /**
+     * LRU 缓存：基于 LinkedHashMap 的 access-order 模式，最大 200 条目。
+     * 缓存键为 sessionId+hash(message)，有效期 5 分钟，避免同一消息短时间内重复分类。
+     */
     private final Map<String, CacheEntry> cache = Collections.synchronizedMap(
             //16：初始容量，HashMap 底层数组初始大小
             //0.75f：负载因子，扩容阈值，元素达到 16*0.75=12 就自动扩容
@@ -102,9 +105,11 @@ public class IntentService implements IIntentService {
                 }
             });
 
-    //缓存的 value 实体
+    /** LRU 缓存条意图识别结果和过期时间戳 */
     private static class CacheEntry {
+        /** 缓存的意图识别结果 */
         IntentResultVO result;
+        /** 过期时间戳（毫秒），超过此时间后缓存失效 */
         long expireTime;
 
         CacheEntry(IntentResultVO result, long expireTime) {

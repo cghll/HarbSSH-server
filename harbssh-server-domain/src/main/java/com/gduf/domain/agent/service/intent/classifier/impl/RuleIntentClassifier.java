@@ -118,6 +118,9 @@ public class RuleIntentClassifier implements IIntentClassifier {
      */
     private static final double COMPOUND_THRESHOLD = 0.5;
 
+    /**
+     * "继续"类关键词集合：命中后且去词剩余内容 ≤4 才视为纯 CONTINUE 指令
+     */
     private static final List<String> CONTINUE_KEYWORDS = List.of("继续", "continue", "接着", "往下", "go on");
 
     @Override
