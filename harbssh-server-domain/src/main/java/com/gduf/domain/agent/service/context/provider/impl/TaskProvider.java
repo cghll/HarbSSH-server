@@ -75,8 +75,8 @@ public class TaskProvider implements ContextProvider {
             return result;
         }
 
-        // 降级：从消息历史中找第一条 user 消息，并清洗可能带的前缀污染。
-        // 这里我们先对可能带前缀的 user message 做一次简单清洗。
+        // 降级：从消息历史中找第一条 user 消息，并清洗可能带的后缀污染。
+        // 这里我们先对可能带后缀的 user message 做一次简单清洗。
         if(messageHistory!=null){
             messageHistory.stream()
                     .filter(m->"user".equals(m.get("role")))
@@ -84,17 +84,17 @@ public class TaskProvider implements ContextProvider {
                     .ifPresent(m -> {
                         String content = (String) m.get("content");
                         if (content != null) {
-                            result.put("taskDescription", stripDynamicPrefix(content));
+                            result.put("taskDescription", stripDynamicSuffix(content));
                         }
                     });
         }
         return result;
     }
-    private String stripDynamicPrefix(String text) {
+    private String stripDynamicSuffix(String text) {
         if (text == null) return null;
         if (text.contains("\n---\n")) {
             String[] parts = text.split("\\n---\\n", 2);
-            return parts.length == 2 ? parts[1].trim() : text;
+            return parts.length == 2 ? parts[0].trim() : text;
         }
         return text;
     }

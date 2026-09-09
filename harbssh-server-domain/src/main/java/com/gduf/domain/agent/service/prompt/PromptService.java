@@ -61,17 +61,19 @@ public class PromptService implements IPromptService {
     @Override
     public String buildEnrichedMessage(String userMessage, String sessionId, String userId, String terminalSessionId,
                                        List<String> recentCommands, List<Map<String, Object>> messageHistory,String intentLabel) {
-        // 意图标签流转：intentLabel → PromptContextVO.intentLabel → DynamicPromptBuilder 前缀
+        // 意图标签流转：intentLabel → PromptContextVO.intentLabel → DynamicPromptBuilder 后缀
         PromptContextVO promptContextVO = chatContextService.buildPromptContext(sessionId, userId, terminalSessionId, messageHistory);
         promptContextVO.setRecentCommands(recentCommands);
         promptContextVO.setIntentLabel(intentLabel);
 
-        String prefix = dynamicPromptBuilder.buildMessagePrefix(promptContextVO);
-        if (prefix.isEmpty()) {
+        String suffix = dynamicPromptBuilder.buildMessageSuffix(promptContextVO);
+        if (suffix.isEmpty()) {
             return userMessage;
         }
 
-        return prefix + "\n---\n" + userMessage;
+        // 动态上下文放到用户消息后面，保证 system + 历史消息 + 用户原始消息这个前缀序列稳定，
+        // 使 LLM Prompt Cache 能命中前面的稳定部分。动态后缀只影响末尾，不影响前缀 hash。
+        return userMessage + "\n---\n" + suffix;
     }
 
     @Override

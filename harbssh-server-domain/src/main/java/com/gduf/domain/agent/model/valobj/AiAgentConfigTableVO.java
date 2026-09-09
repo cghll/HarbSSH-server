@@ -41,7 +41,13 @@ public class AiAgentConfigTableVO {
         @Data
         public static class ChatModel{
             private String model;
+            /**
+             * 推理强度；minimal、low、medium、high（仅推理模型生效，非推理模型忽略）
+             */
+            private String reasoningEffort;
+
             private List<ToolMcp> toolMcpList;
+
             private List<ToolSkills> toolSkillsList;
 
             @Data

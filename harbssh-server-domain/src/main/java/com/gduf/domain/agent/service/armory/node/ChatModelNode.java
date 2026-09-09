@@ -11,6 +11,7 @@ import com.gduf.domain.agent.service.armory.matter.mcp.client.factpry.DefaultMcp
 import com.gduf.domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -60,16 +61,26 @@ public class ChatModelNode extends AbstractArmorySupport {
         }
 
         //构建对话模型
-        ChatModel chatModel = OpenAiChatModel.builder()
+        OpenAiChatOptions.Builder optionsBuilder = OpenAiChatOptions.builder()
+                .model(chatModelConfig.getModel())
+                .toolCallbacks(toolCallbackList)
+                // 开启流式 usage 统计：OpenAI 协议要求 stream_options.include_usage=true，
+                // 末块才返回完整 usage（含 prompt_tokens_details.cached_tokens 缓存命中）。
+                .streamUsage(true);
+
+        // 推理强度（仅推理模型生效，非推理模型忽略）
+        String reasoningEffort = chatModelConfig.getReasoningEffort();
+        if (StringUtils.isNotBlank(reasoningEffort)) {
+            optionsBuilder.reasoningEffort(reasoningEffort);
+        }
+
+        ChatModel rawChatModel = OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
-                .defaultOptions(OpenAiChatOptions.builder()
-                        .model(chatModelConfig.getModel())
-                        .toolCallbacks(toolCallbackList)
-                        .build())
+                .defaultOptions(optionsBuilder.build())
                 .build();
 
         //存到上下文中去
-        dynamicContext.setChatModel(chatModel);
+        dynamicContext.setChatModel(rawChatModel);
 
         return router(requestParameter, dynamicContext);
     }

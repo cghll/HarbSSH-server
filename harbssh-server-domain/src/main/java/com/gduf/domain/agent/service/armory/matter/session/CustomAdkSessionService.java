@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 
 /**
- * HarbSSH 自定义 ADK Session 服务。
+ * WaLiSSH 自定义 ADK Session 服务。
  *
  * <p>这个类并不是去“1:1 复刻” ADK 原生/默认 Session 的完整存储语义，
  * 而是围绕当前 ReAct + SSH 场景，做了一层<strong>面向运行期的轻量化会话治理</strong>。
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * <p>这类“富化消息”适合发给模型做推理，但并不适合再被 ADK 原样存回 Session。
  * 如果直接回灌，会带来几个典型问题：
  * <pre>
- *   1. 用户原始问题被动态前缀污染
+ *   1. 用户原始问题被动态后缀污染
  *   2. 相同上下文在业务层和框架层重复保存
  *   3. tool / assistant 长文本让 Session 持续膨胀
  *   4. 对话轮次越来越长，后续取历史成本越来越高
@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
  * <pre>
  *   1. 只保留运行期轻量 Session，不做持久化落库
  *   2. 不追求保存完整原文历史，而是保存“够用”的净化后历史
- *   3. 不把动态 Prompt 前缀原样写回 Session，避免上下文重复
+ *   3. 不把动态 Prompt 后缀原样写回 Session，避免上下文重复
  *   4. 不保留无限长的 tool/assistant 文本，而是按类型截断
  *   5. 不保留无限轮对话，而是只保留最近 MAX_TURNS 轮、最多 MAX_EVENTS 条
  *   6. 只同步 event 中真正有价值的 stateDelta，维持最新运行态 state
@@ -250,7 +250,7 @@ public class CustomAdkSessionService implements BaseSessionService {
      *   1. normalizeEvent   补齐时间戳与 id
      *   2. resolveRole      判断角色
      *   3. 按角色治理：
-     *      - user      -> sanitizeUserEvent    剥离动态前缀
+     *      - user      -> sanitizeUserEvent    剥离动态后缀
      *      - tool      -> truncateEventText    截断工具长文本
      *      - assistant -> truncateEventText    截断助手长文本
      *   4. rawEvents.add     写入事件
@@ -376,7 +376,7 @@ public class CustomAdkSessionService implements BaseSessionService {
     }
 
     /**
-     * 对 user 事件做净化，去掉动态 Prompt 前缀，只保留原始用户问题。
+     * 对 user 事件做净化，去掉动态 Prompt 后缀，只保留原始用户问题。
      *
      * <p>这一步是“避免上下文重复”的关键动作之一。
      * 因为环境信息、最近命令、关键事件等内容，业务层已经维护了一份，
@@ -385,12 +385,12 @@ public class CustomAdkSessionService implements BaseSessionService {
      * <p>案例：
      * <pre>
      *   输入：
+     *   请继续查看 error.log
+     *   ---
      *   [系统环境]
      *   系统: Linux
      *   [关键事件]
      *   - permission denied
-     *   ---
-     *   请继续查看 error.log
      *
      *   输出：
      *   请继续查看 error.log
@@ -405,7 +405,7 @@ public class CustomAdkSessionService implements BaseSessionService {
             return event;
         }
 
-        String actualUserMessage = stripDynamicPrefix(text);
+        String actualUserMessage = stripDynamicSuffix(text);
         if (actualUserMessage.equals(text)) {
             return event;
         }
@@ -421,55 +421,60 @@ public class CustomAdkSessionService implements BaseSessionService {
     }
 
     /**
-     * 从文本中剥离动态注入前缀。
+     * 从文本中剥离动态注入后缀。
      *
      * <p>优先按 {@code \n---\n} 分隔线切分；若没有分隔线，
-     * 再根据典型前缀段落标签做启发式判断。
+     * 再根据典型后缀段落标签做启发式判断。
      *
      * <p>案例 1：
      * <pre>
+     *   帮我分析日志
+     *   ---
      *   [系统环境]
      *   ...
-     *   ---
-     *   帮我分析日志
      *
      *   结果：帮我分析日志
      * </pre>
      *
      * <p>案例 2：
      * <pre>
+     *   再试一次 ls /var/log
+     *   ---
      *   [关键事件]
      *   - 工具执行失败
-     *   再试一次 ls /var/log
      *
      *   结果：再试一次 ls /var/log
      * </pre>
      *
      * @param text 原始文本
-     * @return 剥离前缀后的文本
+     * @return 剥离后缀后的文本
      */
-    private String stripDynamicPrefix(String text) {
+    private String stripDynamicSuffix(String text) {
         if (text.contains("\n---\n")) {
             String[] parts = text.split("\\n---\\n", 2);
-            return parts.length == 2 ? parts[1].trim() : text;
+            // 新格式：userMessage + "\n---\n" + 动态后缀，取 parts[0] 保留原始用户消息
+            return parts.length == 2 ? parts[0].trim() : text;
         }
 
-        boolean looksLikeInjectedPrefix = text.startsWith("[系统环境]")
-                || text.startsWith("[最近执行的命令]")
-                || text.startsWith("[关键事件]")
-                || text.startsWith("[当前任务]");
-        if (!looksLikeInjectedPrefix) {
+        boolean looksLikeInjectedSuffix = text.endsWith("[系统环境]")
+                || text.endsWith("[最近执行的命令]")
+                || text.endsWith("[关键事件]")
+                || text.endsWith("[当前任务]");
+        if (!looksLikeInjectedSuffix) {
             return text;
         }
 
-        int splitIndex = text.lastIndexOf('\n');
+        int splitIndex = text.indexOf('\n');
         if (splitIndex < 0 || splitIndex >= text.length() - 1) {
             return text;
         }
 
-        String tail = text.substring(splitIndex + 1).trim();
-        return tail.isEmpty() ? text : tail;
+        String head = text.substring(0, splitIndex).trim();
+        return head.isEmpty() ? text : head;
     }
+
+
+
     /**
      * 截断过长的事件文本。
      *
@@ -492,7 +497,7 @@ public class CustomAdkSessionService implements BaseSessionService {
      */
     private Event truncateEventText(Event event, int maxLength) {
         String text = event.stringifyContent();
-        if (text == null || text.length() <= maxLength) {
+        if (text.length() <= maxLength) {
             return event;
         }
 
