@@ -1,102 +1,148 @@
-# ai-agent-scaffold
+# HarbSSH Server
 
-基于 Spring Boot 3.4 + DDD 架构的 AI 智能体脚手架项目，集成 Google ADK、Spring AI、LangChain4j 等主流 AI 框架，提供开箱即用的智能体构建能力。
+HarbSSH Server 是一个面向 SSH 运维场景的 AI Agent 服务端。它将远程连接、终端操作和大模型能力组合在一起，可通过自然语言完成服务器信息查询、故障诊断和经确认的运维操作。
+
+## 主要功能
+
+- SSH 连接信息管理与连接状态维护
+- 远程命令执行、交互式终端读写和窗口调整
+- AI Agent 对话与流式响应
+- 面向 SSH 场景的诊断、分析和变更执行能力
+- 顺序、并行和循环 Agent 工作流
+- MCP 工具、Skills 与自定义插件接入
+- 对话上下文、里程碑和长期记忆持久化
 
 ## 技术栈
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| JDK | 17 | 基础运行环境 |
-| Spring Boot | 3.4.3 | 应用框架 |
-| Spring AI | 1.1.0-M3 | Spring 官方 AI 集成框架 |
-| Google ADK | 0.4.0 | Google Agent Development Kit |
-| LangChain4j | 1.4.0 | LLM 应用开发框架 |
-| MyBatis | 3.0.4 | ORM 持久层框架 |
-| MySQL | 8.x | 数据库 |
-| Maven | 3.x | 构建工具 |
+| 技术 | 版本 | 用途 |
+| --- | --- | --- |
+| JDK | 17 | 运行环境 |
+| Spring Boot | 3.4.3 | Web 服务与应用配置 |
+| Google ADK | 1.2.0 | Agent 构建与运行 |
+| Spring AI | 1.1.8 | 模型与 MCP 集成 |
+| LangChain4j | 1.4.0 | 大模型能力集成 |
+| MyBatis | 3.0.4 | 数据访问 |
+| MySQL | 8.x | 业务数据持久化 |
+| Maven | 3.x | 项目构建 |
 
-## 项目结构
+## 环境要求
 
-```
-ai-agent-scaffold/
-├── ai-agent-scaffold-api/           # API 层：DTO 定义、RPC 接口
-├── ai-agent-scaffold-app/           # 应用启动层：Spring Boot 入口、配置
-├── ai-agent-scaffold-domain/        # 领域层：核心业务逻辑、智能体服务
-├── ai-agent-scaffold-trigger/       # 触发器层：HTTP/REST 接口实现
-├── ai-agent-scaffold-infrastructure/# 基础设施层：持久化、外部服务适配
-├── ai-agent-scaffold-types/         # 类型层：通用常量、异常、枚举
-├── docs/                            # 项目文档
-│   ├── dev-ops/                     # 运维相关（Nginx、Docker）
-│   └── prompt/                      # 提示词模板
-└── data/                            # 数据文件
-```
-
-
+- JDK 17
+- Maven 3.x
+- MySQL 8.x
+- 可用的大模型 API
+- 可选：Docker 与 Docker Compose
 
 ## 快速开始
 
-### 环境要求
-
-- JDK 17+
-- Maven 3.x
-- MySQL 8.x（可选，不启用数据库时无需配置）
-
-### 启动项目
+### 1. 获取项目
 
 ```bash
-# 克隆项目
-git clone https://github.com/cghll/ai-agent-scaffold.git
-cd ai-agent-scaffold
-
-# 编译打包
-mvn clean install -DskipTests
-
-# 启动应用
-cd ai-agent-scaffold-app
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+git clone https://github.com/cghll/HarbSSH-server.git
+cd HarbSSH-server
 ```
 
-启动后访问 `http://localhost:8080`。
+### 2. 初始化数据库
 
-### 配置说明
+确认 MySQL 已启动，然后执行：
 
-主要配置文件位于 `ai-agent-scaffold-app/src/main/resources/`：
+```bash
+mysql -uroot -p < docs/dev-ops/mysql/sql/harbssh.sql
+```
 
-- `application.yml` — 主配置
-- `application-dev.yml` — 开发环境配置
-- `application-test.yml` — 测试环境配置
-- `application-prod.yml` — 生产环境配置
+脚本会自动创建 `harbssh` 数据库及所需数据表。
 
-## 核心功能
+### 3. 配置应用
 
-### 1. Armory 智能体装配引擎
+开发环境配置位于：
 
-基于树形策略路由的结构化智能体工作流定义，支持：
+```text
+harbssh-server-app/src/main/resources/application-dev.yml
+```
 
-- **AgentNode** — 智能体装配节点，支持 LLM Agent 构建
-- **ChatModelNode** — 对话模型节点，集成 MCP 工具调用
-- **RunnerNode** — 执行器节点，支持自定义执行逻辑
-- **Workflow** — 工作流编排，支持多种 Agent 模式和复杂节点流转
+请根据本机环境修改以下内容：
 
-### 2. MCP（Model Context Protocol）支持
+- MySQL 地址、端口、用户名和密码
+- 需要加载的 Agent 配置文件
 
-- 本地化 MCP 服务配置与装配
-- Spring AI MCP Client 集成
-- 自定义 ToolCallbackProvider 注册
+Agent 配置文件位于：
 
-### 3. 多 AI 框架集成
+```text
+harbssh-server-app/src/main/resources/agent/
+```
 
-- **Spring AI**：OpenAI 集成、MCP Client
-- **Google ADK**：Agent 构建、Spring AI 适配器、LangChain4j 适配器
-- **LangChain4j**：LLM 调用链路构建
+至少需要配置模型的 `base-url`、`api-key` 和 `model`。API Key 等敏感信息应仅保存在本地或通过安全的配置管理方式注入，不要提交到版本库。
 
-### 4. 对外服务接口（Trigger）
+### 4. 构建并启动
 
-- RESTful API 智能体对外服务
-- Chat 对话服务接口
-- API 测试工具
+```bash
+mvn clean package "-Dmaven.test.skip=true"
+java -jar harbssh-server-app/target/harbssh-server-app.jar
+```
 
-### 5. 前端页面
+开发环境默认启用 `dev` Profile，服务启动后监听：
 
-提供基础的前端交互页面。
+```text
+http://localhost:8091
+```
+
+也可以使用 Maven 启动应用：
+
+```bash
+mvn clean install "-Dmaven.test.skip=true"
+mvn -pl harbssh-server-app spring-boot:run
+```
+
+## 接口概览
+
+| 能力 | 接口前缀 |
+| --- | --- |
+| Agent 配置查询、会话创建与对话 | `/api/v1/` |
+| SSH 连接管理 | `/api/v1/ssh/connections` |
+| SSH 终端操作 | `/api/v1/ssh/terminal` |
+
+主要接口包括 Agent 列表查询、会话创建、普通对话、流式对话，以及 SSH 连接的创建、查询、连接、断开和终端命令执行。
+
+## 前端演示页
+
+仓库在 `docs/dev-ops/nginx/html/` 下提供了静态演示页面。使用前请将 `config.js` 中的 `API_BASE_URL` 调整为实际服务地址，例如：
+
+```javascript
+const API_BASE_URL = 'http://127.0.0.1:8091';
+```
+
+随后可通过 Nginx 或其他静态文件服务器托管该目录。
+
+## 项目结构
+
+```text
+harbssh-server/
+├── harbssh-server-api             # 对外接口与数据对象
+├── harbssh-server-app             # 应用入口与运行配置
+├── harbssh-server-case            # Agent ReAct 用例编排
+├── harbssh-server-domain          # 核心领域能力
+├── harbssh-server-infrastructure  # 数据库及外部服务适配
+├── harbssh-server-trigger         # HTTP 接口入口
+├── harbssh-server-types           # 公共类型与异常
+└── docs                           # SQL、部署文件和提示词
+```
+
+## 测试
+
+```bash
+mvn test
+```
+
+部分测试依赖 MySQL、模型 API 或可访问的 SSH 主机，运行前请确认对应配置和外部服务可用。
+
+## 部署
+
+项目提供了以下部署相关文件：
+
+- `harbssh-server-app/Dockerfile`：应用镜像定义
+- `docs/dev-ops/docker-compose-environment.yml`：MySQL、Redis 等基础环境
+- `docs/dev-ops/docker-compose-app.yml`：应用容器编排模板
+- `docs/dev-ops/nginx/`：静态页面与 Nginx 资源
+
+部署模板中的镜像名、版本、挂载目录和数据库连接信息需要根据实际环境调整后使用。
 
