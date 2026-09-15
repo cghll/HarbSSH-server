@@ -6,7 +6,9 @@ import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.service.armory.AbstractArmorySupport;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
+import com.gduf.domain.agent.service.armory.matter.session.factory.CustomRunnerFactory;
 import com.gduf.domain.agent.service.armory.matter.tools.SshExecuteAdkTool;
+import com.gduf.domain.agent.service.armory.matter.tools.SubAgentDispatchTool;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.models.springai.SpringAI;
@@ -28,6 +30,9 @@ public class AgentNode extends AbstractArmorySupport {
 
     @Resource
     private SshExecuteAdkTool sshExecuteAdkTool;
+
+    @javax.annotation.Resource
+    private CustomRunnerFactory customRunnerFactory;
     @Override
     protected AiAgentRegisterVO doApply(ArmoryCommandEntity requestParameter, DefaultArmoryFactory.DynamicContext dynamicContext) throws Exception {
         log.info("AI Agent 装配操作-AgentNode");
@@ -107,8 +112,13 @@ public class AgentNode extends AbstractArmorySupport {
                     throw new IllegalArgumentException(
                             "sub agent not found: " + subAgentName);
                 }
-//                adkTools.add(new SubAgentDispatchTool(subAgent, customRunnerFactory));
+                adkTools.add(new SubAgentDispatchTool(subAgent, customRunnerFactory));
             }
+
+            // 批量派发工具：主 Agent 自行拆解任务列表并发派发
+            adkTools.add(new BatchSubAgentDispatchTool(
+                    agents.stream().map(AiAgentConfigTableVO.Module.Agent::getName).toList(),
+                    dynamicAgentOrchestrator));
         }
 
 
