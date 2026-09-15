@@ -103,6 +103,8 @@ public class AiAgentConfigTableVO {
             private String description;
             private String instruction;
             private  String outputKey;
+            //新增：声明本 agent 挂载的子智能体
+            private List<String> subAgents;
         }
         @Data
         public static class AgentWorkflow{
