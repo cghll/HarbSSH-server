@@ -27,13 +27,13 @@ public class DynamicTask {
     /** 要派发的子 Agent 名称，必须存在于 AgentCatalog 注册表中 */
     private String agentName;
     /** 下发给子 Agent 的完整任务指令 */
-    private String request;
+    private String request;         // 任务描述
     /** 依赖的前置任务 ID 列表，所有依赖任务 COMPLETED 后本任务才会被调度 */
     @Builder.Default
-    private List<String> dependsOn = new ArrayList<>();
+    private List<String> dependsOn = new ArrayList<>();     // 依赖的任务 ID（DAG 边）
     /** 单任务执行超时时间（秒），超时后任务标记为 FAILED */
     @Builder.Default
-    private Integer timeoutSeconds = 120;
+    private Integer timeoutSeconds = 120;           // 单任务超时
     /**
      * 失败后自动重试的最大次数（不含首次执行），默认 0 表示不重试。
      * <p>
@@ -42,7 +42,7 @@ public class DynamicTask {
      * 派发非幂等写任务时应保持 0，由主 Agent 拿到失败原因后自行决策。
      */
     @Builder.Default
-    private Integer maxRetries = 0;
+    private Integer maxRetries = 0;         //新增：失败后自动重试次数（不含首次）
     /** 实际执行尝试次数（含首次），由 SubAgentDispatchService 回写，供主 Agent 观察重试情况 */
     @Builder.Default
     private Integer attempts = 0;

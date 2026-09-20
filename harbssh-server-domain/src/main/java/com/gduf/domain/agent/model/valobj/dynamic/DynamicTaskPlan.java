@@ -12,6 +12,7 @@ import java.util.List;
  * <p>
  * 由规划器输出 JSON 经 PlanParser 解析、PlanValidator 校验后构建，
  * 交给 DynamicAgentOrchestrator 按 DAG 依赖关系并发执行。
+ * 任务加并发上限
  */
 @Data
 @Builder
@@ -33,6 +34,6 @@ public class DynamicTaskPlan {
      * （进行中的任务会跑完），剩余任务全部置为 SKIPPED。
      */
     @Builder.Default
-    private Boolean failFast = false;
+    private Boolean failFast = false;       //新增：失败即中止策略
 
 }
