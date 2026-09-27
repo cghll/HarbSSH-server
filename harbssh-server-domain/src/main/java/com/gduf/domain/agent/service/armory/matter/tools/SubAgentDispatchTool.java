@@ -40,8 +40,8 @@ public class SubAgentDispatchTool extends BaseTool {
     /** Runner 工厂，为子 Agent 构建独立执行器,因为之前调整adk内部上下文之后需要用这个配置 */
     private final CustomRunnerFactory runnerFactory;
 
-    public SubAgentDispatchTool(String name, String description, BaseAgent subAgent, CustomRunnerFactory runnerFactory) {
-        super(name, description);
+    public SubAgentDispatchTool(BaseAgent subAgent, CustomRunnerFactory runnerFactory) {
+        super(subAgent.name(), subAgent.description());
         this.subAgent = subAgent;
         this.runnerFactory = runnerFactory;
     }
