@@ -6,6 +6,7 @@ import com.gduf.domain.agent.model.entity.ChatMessageEntity;
 import com.gduf.domain.agent.model.entity.ChatSessionEntity;
 import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
+import com.gduf.domain.agent.model.valobj.dynamic.AgentExecutionContext;
 import com.gduf.domain.agent.model.valobj.properties.AiAgentAutoConfigProperties;
 import com.gduf.domain.agent.service.IChatService;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -43,6 +45,9 @@ public class ChatService implements IChatService {
     private IChatHistoryRepository chatHistoryRepository;
 
     private final Map<String,String> userSessions=new ConcurrentHashMap<>();
+
+    /** 业务会话 ID -> SSH 终端会话 ID 绑定关系，用于派发子 Agent 时透传终端上下文 */
+    private final Map<String, String> sessionTerminalContext = new ConcurrentHashMap<>();
     @Override
     public List<AiAgentConfigTableVO.Agent> queryAiAgentConfig() {
         Map<String, AiAgentConfigTableVO> tables = aiAgentAutoConfigProperties.getTables();
@@ -89,6 +94,18 @@ public class ChatService implements IChatService {
         });
     }
 
+    /** 建立/更新业务会话与 SSH 终端会话的绑定关系（供后续消息流式处理时回填） */
+    public void bindTerminalSession(String sessionId, String terminalSessionId) {
+        if (sessionId != null && !sessionId.isBlank() && terminalSessionId != null && !terminalSessionId.isBlank()) {
+            sessionTerminalContext.put(sessionId, terminalSessionId);
+        }
+    }
+
+    /** 查询业务会话绑定的 SSH 终端会话 ID，未绑定时返回 Optional.empty() */
+    public Optional<String> getTerminalSession(String sessionId) {
+        return Optional.ofNullable(sessionTerminalContext.get(sessionId));
+    }
+
     @Override
     public List<String> handleMessage(String agentId, String userId, String message) {
         AiAgentRegisterVO aiAgentRegisterVO = defaultArmoryFactory.getAiAgentRegisterVO(agentId);
@@ -114,6 +131,18 @@ public class ChatService implements IChatService {
         return outputs;
     }
 
+    /**
+     * 带执行上下文的消息处理：先把上下文中的 SSH 终端会话写入 ThreadLocal，
+     * 使本轮对话（含子 Agent 派发）内的 SSH 工具复用该终端，再走标准消息处理。
+     */
+    public List<String> handleMessage(String agentId, String userId, String sessionId, String message,
+                                      AgentExecutionContext context) {
+        if (context != null && context.getTerminalSessionId() != null) {
+            SshExecuteAdkTool.setCurrentTerminalSession(context.getTerminalSessionId());
+        }
+        return handleMessage(agentId, userId, sessionId, message);
+    }
+
     @Override
     public Flowable<Event> handleMessageStream(String agentId, String userId, String sessionId, String message) {
         AiAgentRegisterVO aiAgentRegisterVO = defaultArmoryFactory.getAiAgentRegisterVO(agentId);
@@ -133,10 +162,13 @@ public class ChatService implements IChatService {
         }
         Runner runner = aiAgentRegisterVO.getRunner();
 
-        // 设置终端会话ID到ThreadLocal，供工具使用
+        // 设置终端会话ID到ThreadLocal，供mcp工具使用
         if(terminalSessionId!=null&&!terminalSessionId.isEmpty()){
             log.info("设置终端会话ID: {}", terminalSessionId);
             SshExecuteAdkTool.setCurrentTerminalSession(terminalSessionId);
+        } else {
+            // 本次请求未显式携带终端会话时，回退到该业务会话的绑定关系
+            getTerminalSession(sessionId).ifPresent(SshExecuteAdkTool::setCurrentTerminalSession);
         }
 
         Content userMsg = Content.fromParts(Part.fromText(message));
