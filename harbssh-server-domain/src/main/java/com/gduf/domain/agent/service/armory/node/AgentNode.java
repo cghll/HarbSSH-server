@@ -5,8 +5,11 @@ import com.gduf.domain.agent.model.entity.ArmoryCommandEntity;
 import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.service.armory.AbstractArmorySupport;
+import com.gduf.domain.agent.service.armory.catalog.AgentCatalog;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
-import com.gduf.domain.agent.service.armory.matter.tools.SshExecuteAdkTool;
+import com.gduf.domain.agent.service.armory.matter.session.factory.CustomRunnerFactory;
+import com.gduf.domain.agent.service.armory.matter.tools.*;
+import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.models.springai.SpringAI;
 import com.google.adk.tools.FunctionTool;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -26,6 +30,24 @@ public class AgentNode extends AbstractArmorySupport {
 
     @Resource
     private SshExecuteAdkTool sshExecuteAdkTool;
+
+    @Resource
+    private CustomRunnerFactory customRunnerFactory;
+
+    @Resource
+    private AgentCatalog agentCatalog;
+
+    @Resource
+    private DynamicAgentOrchestrator dynamicAgentOrchestrator;
+
+    @Resource
+    private PlannerAgentBuilder plannerAgentBuilder;
+
+    @Resource
+    private PlanParser planParser;
+
+    @Resource
+    private PlanValidator planValidator;
     @Override
     protected AiAgentRegisterVO doApply(ArmoryCommandEntity requestParameter, DefaultArmoryFactory.DynamicContext dynamicContext) throws Exception {
         log.info("AI Agent 装配操作-AgentNode");
@@ -70,7 +92,81 @@ public class AgentNode extends AbstractArmorySupport {
 
             dynamicContext.getAgentGroup().put(agentConfig.getName(),llmAgent);
         }
+
+        // 子agent派发的核心机制，就是把其他智能体作为工具使用（要不给你留个小作业，把subagent的构建，放到下一个单独的 SubAgentNode 节点，串联使用）
+        buildAgentTools(
+                dynamicContext,
+                agents,
+                chatModel,
+                aiAgentConfigTableVO.getModule().getChatModel().getModel());
+
         return router(requestParameter, dynamicContext);
+    }
+
+    /**
+     * 为配置了 subAgents 的父 Agent 重新装配"多 Agent 派发"能力：
+     * <ol>
+     *   <li>把每个声明的子 Agent 包装成 {@link SubAgentDispatchTool}（单 Agent 派发工具）</li>
+     *   追加 {@link BatchSubAgentDispatchTool}（主 Agent 自行拆解任务的批量派发工具）</li>
+     *   <li>追加 {@link DynamicPlanDispatchTool}（由独立规划器生成计划的动态派发工具）</li>
+     * </ol>
+     * 用同一套配置重建父 Agent 并覆盖 agentGroup，使其获得派发类工具；
+     * 子 Agent 未在配置中声明时直接抛出异常，fail-fast。
+     */
+    private void buildAgentTools(
+            DefaultArmoryFactory.DynamicContext dynamicContext,
+            List<AiAgentConfigTableVO.Module.Agent> agents,
+            ChatModel chatModel,
+            String modelName) throws Exception {
+
+        Map<String, BaseAgent> agentGroup = dynamicContext.getAgentGroup();
+
+        for (AiAgentConfigTableVO.Module.Agent agentConfig : agents) {
+            // 未声明 subAgents 的 Agent 不需要派发能力，跳过重建
+            List<String> subAgentNames = agentConfig.getSubAgents();
+            if (subAgentNames == null || subAgentNames.isEmpty()) {
+                continue;
+            }
+
+            List<Object> adkTools = new ArrayList<>();
+
+            // 为每个声明的子 Agent 构建单独的派发工具（工具名即子 Agent 名，LLM 可直接点名调用）
+            for (String subAgentName : subAgentNames) {
+                BaseAgent subAgent = agentGroup.get(subAgentName);
+                if (subAgent == null) {
+                    throw new IllegalArgumentException(
+                            "sub agent not found: " + subAgentName);
+                }
+                adkTools.add(new SubAgentDispatchTool(subAgent, customRunnerFactory));
+            }
+
+            // 批量派发工具：主 Agent 自行拆解任务列表并发派发
+            adkTools.add(new BatchSubAgentDispatchTool(
+                    agents.stream().map(AiAgentConfigTableVO.Module.Agent::getName).toList(),
+                    dynamicAgentOrchestrator));
+
+            // 动态规划派发工具：由独立规划器 LLM 生成任务计划后派发
+            adkTools.add(new DynamicPlanDispatchTool(
+                    plannerAgentBuilder,
+                    dynamicAgentOrchestrator,
+                    planParser,
+                    planValidator,
+                    dynamicContext.getOpenAiApi(),
+                    modelName,
+                    agents.stream().map(AiAgentConfigTableVO.Module.Agent::getName).toList()));
+
+            // 和前面node节点里一样，创建智能体
+            LlmAgent parentAgent = LlmAgent.builder()
+                    .name(agentConfig.getName())
+                    .description(agentConfig.getDescription())
+                    .model(new SpringAI(chatModel))
+                    .instruction(agentConfig.getInstruction())
+                    .outputKey(agentConfig.getOutputKey())
+                    .tools(adkTools)
+                    .build();
+
+            agentGroup.put(agentConfig.getName(), parentAgent);
+        }
     }
 
     @Override

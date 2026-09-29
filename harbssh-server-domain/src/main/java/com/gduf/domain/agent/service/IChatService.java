@@ -25,6 +25,11 @@ public interface IChatService {
     String createSession(String agentId,String userId);
 
     /**
+     * 绑定业务会话与 SSH 终端会话
+     */
+    void bindTerminalSession(String sessionId, String terminalSessionId);
+
+    /**
      * 处理消息
      * @param agentId 智能体ID
      * @param userId 用户ID

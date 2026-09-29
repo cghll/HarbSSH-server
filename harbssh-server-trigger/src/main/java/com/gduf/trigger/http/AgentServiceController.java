@@ -170,6 +170,7 @@ public class AgentServiceController implements IAgentService {
 
             //异步执行，避免堵塞HTTP线程
             String finalSessionId=sessionId;
+            chatService.bindTerminalSession(finalSessionId, terminalSessionId);
             new Thread(() -> {
                 ObjectMapper objectMapper = new ObjectMapper();
                 // 心跳保活线程：在 AI 处理期间定期发送 SSE 注释行，防止浏览器/proxy 超时断开

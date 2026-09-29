@@ -5,6 +5,7 @@ import com.gduf.domain.agent.model.entity.ArmoryCommandEntity;
 import com.gduf.domain.agent.model.valobj.AiAgentConfigTableVO;
 import com.gduf.domain.agent.model.valobj.AiAgentRegisterVO;
 import com.gduf.domain.agent.service.armory.AbstractArmorySupport;
+import com.gduf.domain.agent.service.armory.catalog.AgentCatalog;
 import com.gduf.domain.agent.service.armory.factory.DefaultArmoryFactory;
 import com.gduf.domain.agent.service.armory.matter.session.factory.CustomRunnerFactory;
 import com.gduf.types.enums.ResponseCode;
@@ -31,6 +32,10 @@ public class RunnerNode extends AbstractArmorySupport {
     @Resource
     private CustomRunnerFactory customRunnerFactory;
 
+    @Resource
+    private AgentCatalog agentCatalog;
+
+
     @Override
     protected AiAgentRegisterVO doApply(ArmoryCommandEntity requestParameter, DefaultArmoryFactory.DynamicContext dynamicContext) throws Exception {
         log.info("AI Agent 装配操作-RunnerNode");
@@ -42,6 +47,9 @@ public class RunnerNode extends AbstractArmorySupport {
         String agentDesc = agent.getAgentDesc();
 
         Runner runner = getRunner(dynamicContext, aiAgentConfigTableVO, appName);
+
+        // 把装配完成的子 Agent 分组登记到注册表，供子 Agent 派发时按名称查找
+        agentCatalog.register(agentId, dynamicContext.getAgentGroup());
 
         AiAgentRegisterVO aiAgentRegisterVO = AiAgentRegisterVO.builder()
                 .appName(appName)
